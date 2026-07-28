@@ -8,7 +8,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
   <style>
     :root {
@@ -559,47 +558,106 @@
 
     .stamp-date { font-size: 9px; color: var(--sand); margin-top: 3px; }
 
-    /* ── REWARDS ── */
-    .rewards-section { margin-top: 24px; }
-
-    .rewards-section h3 {
-      font-family: 'Playfair Display', serif;
+    /* ── MEDALLAS ── */
+    .medals-btn {
+      width: 100%;
+      margin: 0 0 20px;
+      padding: 14px 18px;
+      border: 2px solid var(--espresso);
+      border-radius: 14px;
+      background: var(--foam);
       color: var(--espresso);
-      font-size: 18px;
-      margin-bottom: 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
     }
 
-    .reward-card {
-      background: var(--foam);
-      border: 1.5px solid rgba(122,63,37,.15);
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 10px;
+    .medals-btn:hover {
+      background: var(--warm);
+      transform: translateY(-1px);
+    }
+
+    .medals-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
       display: flex;
       align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(62,31,14,.48);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s ease;
+    }
+
+    .medals-overlay.open { opacity: 1; pointer-events: all; }
+
+    .medals-modal {
+      width: 100%;
+      max-width: 560px;
+      max-height: 85vh;
+      overflow-y: auto;
+      background: var(--foam);
+      border: 2px solid rgba(122,63,37,.18);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 24px 60px rgba(62,31,14,.35);
+      transform: scale(.94) translateY(10px);
+      transition: transform .25s ease;
+    }
+
+    .medals-overlay.open .medals-modal { transform: scale(1) translateY(0); }
+
+    .medals-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .medals-title {
+      font-family: 'Playfair Display', serif;
+      color: var(--dark);
+      font-size: 24px;
+    }
+
+    .medals-subtitle {
+      color: var(--espresso);
+      opacity: .65;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .medals-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
       gap: 14px;
-      transition: transform .15s;
     }
 
-    .reward-card:hover { transform: translateY(-1px); }
-
-    .reward-icon { font-size: 32px; flex-shrink: 0; }
-    .reward-info { flex: 1; }
-
-    .reward-title { font-weight: 600; color: var(--dark); font-size: 15px; }
-
-    .reward-desc { font-size: 13px; color: var(--espresso); opacity: .7; margin-top: 2px; }
-
-    .reward-badge {
+    .medal-slot {
+      aspect-ratio: 1;
+      border: 2px dashed #aaa;
+      border-radius: 50%;
+      background: rgba(160,160,160,.07);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #aaa;
       font-size: 12px;
-      font-weight: 600;
-      padding: 5px 10px;
-      border-radius: 20px;
-      white-space: nowrap;
+      font-weight: 700;
+      user-select: none;
     }
 
-    .reward-badge.locked { background: rgba(122,63,37,.1); color: var(--espresso); }
-    .reward-badge.unlocked { background: var(--stamp-gold); color: white; }
+    @media (max-width: 480px) {
+      .medals-grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+      .medals-modal { padding: 20px 16px; }
+    }
 
     /* ── CAFE DETAIL MODAL ── */
     .overlay {
@@ -746,7 +804,7 @@
     .checkin-btn.unstamped { background: var(--espresso); color: var(--cream); }
     .checkin-btn.unstamped:hover { background: var(--dark); transform: translateY(-1px); }
     .checkin-btn.stamped { background: var(--stamp-gold); color: white; }
-    .checkin-btn.visited { background: rgba(122,63,37,.1); color: var(--espresso); cursor: default; }
+    .checkin-btn.visited { background: rgba(192,57,43,.1); color: #a93226; cursor: pointer; border: 1.5px solid rgba(192,57,43,.22); }
 
     /* ── TOAST ── */
     .toast {
@@ -1165,10 +1223,7 @@
         <div class="progress-label" id="progress-label">0 de 33 sellos</div>
       </div>
     </div>
-    <div class="rewards-section">
-      <h3>Recompensas</h3>
-      <div id="rewards-list"></div>
-    </div>
+    <button class="medals-btn" onclick="openMedals()">🏅 Ver Medallas</button>
     <div class="stamps-section" style="margin-top:24px;">
       <h3>Mis Sellos</h3>
       <div class="stamps-grid" id="stamps-grid"></div>
@@ -1193,46 +1248,15 @@
     </div>
   </div>
 
-  <!-- VERIFY MODAL -->
-  <div class="overlay" id="verify-overlay" onclick="closeVerify(event)">
-    <div class="cafe-sheet" id="verify-sheet">
-      <div class="sheet-handle"></div>
-      <div class="sheet-header">
-        <h2>Verificar visita</h2>
-        <button class="sheet-close" onclick="closeVerifyOverlay()">✕</button>
+  <!-- MEDALS MODAL -->
+  <div class="medals-overlay" id="medals-overlay" onclick="closeMedals(event)">
+    <div class="medals-modal">
+      <div class="medals-header">
+        <h2 class="medals-title">Mis Medallas</h2>
+        <button class="sheet-close" onclick="closeMedalsOverlay()">✕</button>
       </div>
-
-      <div id="verify-code">
-        <button class="checkin-btn unstamped" style="margin-bottom:14px;" onclick="startQrScan()">📷 Escanear código QR</button>
-
-        <div id="qr-scanner-wrap" style="display:none;margin-bottom:14px;">
-          <video id="qr-video" playsinline muted style="width:100%;border-radius:12px;background:#000;display:block;"></video>
-          <canvas id="qr-canvas" style="display:none;"></canvas>
-          <div id="qr-status" style="font-size:12px;color:var(--espresso);opacity:.7;text-align:center;margin-top:8px;">
-            Apunta la cámara al código QR del café ☕
-          </div>
-          <button class="checkin-btn"
-                  style="margin-top:8px;background:rgba(122,63,37,.1);color:var(--espresso);"
-                  onclick="stopQrScan()">
-            Cancelar escaneo
-          </button>
-        </div>
-
-        <div style="text-align:center;font-size:12px;color:var(--espresso);opacity:.5;margin:10px 0;">
-          — o ingresa el código manualmente —
-        </div>
-
-        <input id="code-input"
-               type="text"
-               placeholder="Ingresa el código del café"
-               style="width:100%;padding:14px;border-radius:12px;border:2px solid rgba(122,63,37,.25);font-size:16px;text-align:center;"/>
-
-        <button class="checkin-btn unstamped"
-                style="margin-top:12px;"
-                onclick="confirmFromCode()">
-          ✓ Confirmar
-        </button>
-      </div>
+      <div class="medals-subtitle">Aquí aparecerán las medallas que vayas ganando.</div>
+      <div class="medals-grid" id="medals-grid"></div>
     </div>
   </div>
 
@@ -1264,7 +1288,7 @@
     import { initializeApp }                      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut as fbSignOut }
                                                   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot }
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField }
                                                   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     let app, auth, db, provider, currentUser = null, unsubscribeSnapshot = null;
@@ -1448,6 +1472,24 @@
       }
     };
 
+    // ── Firestore: remove check-in ──
+    window.removeCheckin = async function(cafeName) {
+      setSyncDot('syncing');
+      try {
+        if (CONFIGURED && currentUser) {
+          const ref = doc(db, 'users', currentUser.uid);
+          await updateDoc(ref, { [`visited.${safeFbKey(cafeName)}`]: deleteField() });
+        } else {
+          localStorage.setItem('cafeVisited', JSON.stringify(visited));
+        }
+        setSyncDot('synced');
+      } catch (e) {
+        console.error(e);
+        setSyncDot('');
+        showToast('No se pudo cancelar el registro ❌');
+      }
+    };
+
     // ── Firestore: save profile ──
     window.saveProfile = async function(profileData) {
       setSyncDot('syncing');
@@ -1476,6 +1518,9 @@
       visited = JSON.parse(localStorage.getItem('cafeVisited') || '{}');
       profile = JSON.parse(localStorage.getItem('cafeProfile') || 'null');
       window.saveCheckin = function(cafeName) {
+        localStorage.setItem('cafeVisited', JSON.stringify(visited));
+      };
+      window.removeCheckin = function() {
         localStorage.setItem('cafeVisited', JSON.stringify(visited));
       };
       window.saveProfile = function(profileData) {
@@ -1572,15 +1617,6 @@
       { name:"PALOMINA COFFEE SHOP", address:"Los Pinitos, Sonora", coords:[29.235063,-110.887409], menu:["Café de Rancho","Atole","Pan Sonorense","Burritos"], hours:{lun:"7–19",mar:"7–19",mie:"7–19",jue:"7–19",vie:"7–20",sab:"8–20",dom:"8–17"} }
     ];
 
-    const REWARDS = [
-      { id:'r1', title:'Primera Taza',       desc:'Visita tu primer café del pasaporte',       icon:'☕', need:1 },
-      { id:'r2', title:'Explorador Novato',  desc:'Visita 5 cafés diferentes',                 icon:'🗺️', need:5 },
-      { id:'r3', title:'Amante del Café',    desc:'Visita 10 cafés diferentes',                icon:'❤️', need:10 },
-      { id:'r4', title:'Pasaporte a Medias', desc:'Completa la mitad del pasaporte',           icon:'📖', need:Math.ceil(cafes.length/2) },
-      { id:'r5', title:'Gran Explorador',    desc:'Visita 25 cafés del pasaporte',             icon:'🏆', need:25 },
-      { id:'r6', title:'Pasaporte Completo', desc:'¡Visita todos los cafés asociados!',        icon:'⭐', need:cafes.length }
-    ];
-
     // ──────────────────────────────────────────────
     // STATE
     // ──────────────────────────────────────────────
@@ -1590,8 +1626,6 @@
     let mapInitialized = false;
     let markersByName = new Map();
     let mapInstance = null;
-    let qrStream = null;
-    let qrAnimationId = null;
 
     function visitedCount() { return Object.keys(visited).length; }
 
@@ -1805,7 +1839,7 @@
       const btn = document.getElementById('checkin-btn');
       const v = visited[cafe.name];
       if (v) {
-        btn.textContent = '✓ Visitado el ' + v;
+        btn.textContent = 'Cancelar registro · Visitado el ' + v;
         btn.className = 'checkin-btn visited';
       } else {
         btn.textContent = 'Registrar Visita ☕';
@@ -1825,134 +1859,48 @@
 
 window.doCheckin = function() {
   if (!currentCafe) return;
-  if (visited[currentCafe.name]) return;
 
-  document.getElementById('code-input').value = '';
-  document.getElementById('qr-scanner-wrap').style.display = 'none';
-  document.getElementById('verify-overlay').classList.add('open');
+  if (visited[currentCafe.name]) {
+    cancelarVisita();
+    return;
+  }
 
-  setTimeout(() => {
-    document.getElementById('code-input').focus();
-  }, 100);
+  registrarVisita();
 };
 
-  
+function cancelarVisita() {
+  if (!currentCafe || !visited[currentCafe.name]) return;
 
-  function closeVerifyOverlay() {
-  stopQrScan();
-  document.getElementById('verify-overlay').classList.remove('open');
+  const cafeName = currentCafe.name;
+  delete visited[cafeName];
+  if (window.removeCheckin) window.removeCheckin(cafeName);
+
+  refreshMarkers();
+  const btn = document.getElementById('checkin-btn');
+  btn.textContent = 'Registrar Visita ☕';
+  btn.className = 'checkin-btn unstamped';
+  showToast('Registro cancelado');
 }
 
-function closeVerify(e) {
-  if (e.target === document.getElementById('verify-overlay')) {
-    closeVerifyOverlay();
-  }
+function openMedals() {
+  const grid = document.getElementById('medals-grid');
+  grid.innerHTML = Array.from({ length: 20 }, (_, i) =>
+    `<div class="medal-slot" aria-label="Espacio de medalla ${i + 1}">${i + 1}</div>`
+  ).join('');
+  document.getElementById('medals-overlay').classList.add('open');
 }
 
-// ──────────────────────────────────────────────
-// ESCÁNER QR (usa jsQR + cámara del dispositivo)
-// ──────────────────────────────────────────────
-function startQrScan() {
-  const wrap  = document.getElementById('qr-scanner-wrap');
-  const video = document.getElementById('qr-video');
-  const status = document.getElementById('qr-status');
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showToast('Tu navegador no soporta cámara ❌');
-    return;
-  }
-
-  wrap.style.display = 'block';
-  status.textContent = 'Apunta la cámara al código QR del café ☕';
-
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then(stream => {
-      qrStream = stream;
-      video.srcObject = stream;
-      video.play();
-      qrAnimationId = requestAnimationFrame(scanQrFrame);
-    })
-    .catch(err => {
-      console.error(err);
-      showToast('No se pudo acceder a la cámara ❌');
-      wrap.style.display = 'none';
-    });
-}
-window.startQrScan = startQrScan;
-
-function scanQrFrame() {
-  const video  = document.getElementById('qr-video');
-  const canvas = document.getElementById('qr-canvas');
-  if (!video || !qrStream) return;
-
-  if (video.readyState !== video.HAVE_ENOUGH_DATA) {
-    qrAnimationId = requestAnimationFrame(scanQrFrame);
-    return;
-  }
-
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const result = jsQR(imageData.data, imageData.width, imageData.height, {
-    inversionAttempts: 'dontInvert'
-  });
-
-  if (result && result.data) {
-    handleQrResult(result.data);
-  } else {
-    qrAnimationId = requestAnimationFrame(scanQrFrame);
-  }
+function closeMedalsOverlay() {
+  document.getElementById('medals-overlay').classList.remove('open');
 }
 
-function handleQrResult(data) {
-  const status = document.getElementById('qr-status');
-  const value = data.trim().toLowerCase();
-
-  if (value === 'cafe26') {
-    status.textContent = '¡Código válido! ✓';
-    stopQrScan();
-    closeVerifyOverlay();
-    registrarVisita();
-  } else {
-    showToast('Código QR no válido ❌');
-    // sigue escaneando por si apuntó a otro código sin querer
-    qrAnimationId = requestAnimationFrame(scanQrFrame);
-  }
+function closeMedals(e) {
+  if (e.target === document.getElementById('medals-overlay')) closeMedalsOverlay();
 }
 
-function stopQrScan() {
-  if (qrAnimationId) cancelAnimationFrame(qrAnimationId);
-  qrAnimationId = null;
-
-  if (qrStream) {
-    qrStream.getTracks().forEach(t => t.stop());
-    qrStream = null;
-  }
-
-  const video = document.getElementById('qr-video');
-  if (video) video.srcObject = null;
-
-  const wrap = document.getElementById('qr-scanner-wrap');
-  if (wrap) wrap.style.display = 'none';
-}
-window.stopQrScan = stopQrScan;
-
-function confirmFromCode() {
-  const code = document.getElementById('code-input')
-    .value.trim()
-    .toLowerCase();
-
-  if (code === 'cafe26') {
-    closeVerifyOverlay();
-    registrarVisita();
-  } else {
-    showToast('Código incorrecto ❌');
-    document.getElementById('code-input').value = '';
-  }
-}
+window.openMedals = openMedals;
+window.closeMedalsOverlay = closeMedalsOverlay;
+window.closeMedals = closeMedals;
 
     function registrarVisita() {
       const today = new Date().toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
@@ -1960,13 +1908,10 @@ function confirmFromCode() {
       if (window.saveCheckin) window.saveCheckin(currentCafe.name, today);
       refreshMarkers();
       const btn = document.getElementById('checkin-btn');
-      btn.textContent = '✓ Visitado el ' + today;
+      btn.textContent = 'Cancelar registro · Visitado el ' + today;
       btn.className = 'checkin-btn visited';
       const count = visitedCount();
       showToast('¡Sello agregado! Llevas ' + count + ' de ' + cafes.length + ' ☕');
-      REWARDS.forEach(r => {
-        if (count === r.need) setTimeout(() => showToast('🏆 Recompensa: ' + r.title + '!'), 3600);
-      });
     }
 
     // ──────────────────────────────────────────────
@@ -1985,18 +1930,6 @@ function confirmFromCode() {
       document.getElementById('progress-fill').style.width = pct + '%';
       document.getElementById('progress-label').textContent = count + ' de ' + total + ' sellos';
 
-      document.getElementById('rewards-list').innerHTML = REWARDS.map(r => {
-        const unlocked = count >= r.need;
-        return `
-          <div class="reward-card">
-            <div class="reward-icon">${r.icon}</div>
-            <div class="reward-info">
-              <div class="reward-title">${r.title}</div>
-              <div class="reward-desc">${r.desc}</div>
-            </div>
-            <div class="reward-badge ${unlocked ? 'unlocked' : 'locked'}">${unlocked ? '¡Desbloqueado!' : r.need + ' cafés'}</div>
-          </div>`;
-      }).join('');
 
       document.getElementById('stamps-grid').innerHTML = cafes.map(c => {
         const v = visited[c.name];
