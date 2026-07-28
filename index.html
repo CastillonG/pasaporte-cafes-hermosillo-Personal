@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pasaporte del Café — Hermosillo</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <style>
+    :root {
+      --cream:    #f5ead8;
+      --warm:     #f0d9be;
+      --sand:     #d8b98a;
+      --espresso: #7a3f25;
+      --dark:     #3e1f0e;
+      --latte:    #d8a47f;
+      --foam:     #fdf6ed;
+      --green:    #4a7c59;
+      --stamp-gold: #c9a227;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--cream);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── AUTH SCREEN ── */
+    .auth-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--espresso);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 24px;
+      transition: opacity .4s ease, transform .4s ease;
+    }
+
+    .auth-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-20px);
+    }
+
+    .auth-logo {
+      font-size: 64px;
+      margin-bottom: 16px;
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,.3));
+    }
+
+    .auth-title {
+      font-family: 'Playfair Display', serif;
+      color: var(--cream);
+      font-size: 28px;
+      letter-spacing: 2px;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .auth-subtitle {
+      color: var(--sand);
+      font-size: 14px;
+      letter-spacing: 1px;
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .auth-card {
+      background: rgba(245,234,216,.08);
+      border: 1px solid rgba(245,234,216,.15);
+      border-radius: 24px;
+      padding: 32px 28px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+    }
+
+    .auth-card p {
+      color: rgba(245,234,216,.7);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+
+    .google-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 20px;
+      background: white;
+      color: #3c4043;
+      border: none;
+      border-radius: 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      box-shadow: 0 4px 16px rgba(0,0,0,.25);
+    }
+
+    .google-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,.3);
+    }
+
+    .google-btn:active { transform: translateY(0); }
+
+    .google-btn svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .auth-loading {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: var(--sand);
+      font-size: 14px;
+    }
+
+    .auth-loading.show { display: flex; }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid rgba(245,234,216,.2);
+      border-top-color: var(--cream);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      background: var(--espresso);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .topbar h1 {
+      font-family: 'Playfair Display', serif;
+      color: var(--cream);
+      font-size: 18px;
+      letter-spacing: 1.5px;
+      white-space: nowrap;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .nav-tab {
+      padding: 7px 14px;
+      border-radius: 20px;
+      background: transparent;
+      border: 1.5px solid rgba(245,234,216,.3);
+      color: rgba(245,234,216,.7);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+
+    .nav-tab.active, .nav-tab:hover {
+      background: rgba(245,234,216,.15);
+      color: var(--cream);
+      border-color: rgba(245,234,216,.7);
+    }
+
+    .nav-tab.active {
+      background: rgba(245,234,216,.22);
+      border-color: var(--cream);
+    }
+
+    /* User avatar button */
+    .user-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(245,234,216,.12);
+      border: 1.5px solid rgba(245,234,216,.25);
+      border-radius: 24px;
+      padding: 5px 12px 5px 5px;
+      cursor: pointer;
+      transition: background .2s;
+      color: var(--cream);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .user-btn:hover { background: rgba(245,234,216,.2); }
+
+    .user-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1.5px solid rgba(245,234,216,.4);
+    }
+
+    .user-avatar-placeholder {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--sand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--espresso);
+      flex-shrink: 0;
+    }
+
+    /* Sync indicator */
+    .sync-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--stamp-gold);
+      display: inline-block;
+      margin-left: 2px;
+    }
+
+    .sync-dot.synced { background: var(--green); }
+    .sync-dot.syncing { animation: pulse 1s ease infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .3; }
+    }
+
+    /* ── USER DROPDOWN ── */
+    .user-dropdown {
+      position: fixed;
+      top: 58px;
+      right: 16px;
+      background: var(--foam);
+      border: 1.5px solid rgba(122,63,37,.15);
+      border-radius: 16px;
+      padding: 8px;
+      z-index: 1100;
+      min-width: 220px;
+      box-shadow: 0 12px 32px rgba(62,31,14,.18);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-8px);
+      transition: all .2s;
+    }
+
+    .user-dropdown.open {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateY(0);
+    }
+
+    .dropdown-header {
+      padding: 10px 12px 12px;
+      border-bottom: 1px solid rgba(122,63,37,.1);
+      margin-bottom: 6px;
+    }
+
+    .dropdown-name {
+      font-weight: 600;
+      color: var(--dark);
+      font-size: 14px;
+    }
+
+    .dropdown-email {
+      font-size: 12px;
+      color: var(--espresso);
+      opacity: .6;
+      margin-top: 2px;
+    }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--dark);
+      transition: background .15s;
+    }
+
+    .dropdown-item:hover { background: var(--warm); }
+
+    .dropdown-item.danger { color: #c0392b; }
+    .dropdown-item.danger:hover { background: #fdecea; }
+
+    /* ── PAGES ── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── MAP PAGE ── */
+    .map-page { padding: 16px; }
+
+    .searchbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+      position: relative;
+    }
+
+    .searchbar input {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 2px solid rgba(122,63,37,.25);
+      outline: none;
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--foam);
+      color: var(--espresso);
+    }
+
+    .searchbar input:focus { border-color: var(--espresso); }
+
+    .searchbar button {
+      padding: 12px 18px;
+      border-radius: 12px;
+      border: none;
+      background: var(--espresso);
+      color: var(--cream);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+
+    .searchbar button:hover { background: var(--dark); }
+
+    .suggestions {
+      position: absolute;
+      top: 50px;
+      left: 0;
+      right: 80px;
+      background: var(--foam);
+      border: 1.5px solid rgba(122,63,37,.2);
+      border-radius: 12px;
+      overflow: hidden;
+      display: none;
+      z-index: 9999;
+      box-shadow: 0 8px 24px rgba(62,31,14,.12);
+    }
+
+    .suggestion {
+      padding: 11px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--espresso);
+      border-bottom: 1px solid rgba(122,63,37,.08);
+      transition: background .15s;
+    }
+
+    .suggestion:last-child { border-bottom: none; }
+    .suggestion:hover { background: var(--warm); }
+
+    #map {
+      width: 100%;
+      height: 70vh;
+      border-radius: 16px;
+      border: 2px solid rgba(122,63,37,.25);
+    }
+
+    /* ── PASSPORT PAGE ── */
+    .passport-page {
+      padding: 20px 16px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .passport-cover {
+      background: var(--espresso);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 20px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .passport-cover::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        45deg, transparent, transparent 20px,
+        rgba(255,255,255,.03) 20px, rgba(255,255,255,.03) 40px
+      );
+    }
+
+    .passport-cover h2 {
+      font-family: 'Playfair Display', serif;
+      color: var(--cream);
+      font-size: 22px;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+      position: relative;
+    }
+
+    .passport-cover .subtitle {
+      color: var(--sand);
+      font-size: 13px;
+      letter-spacing: 1px;
+      position: relative;
+    }
+
+    .passport-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+      position: relative;
+    }
+
+    .stat-box {
+      background: rgba(245,234,216,.1);
+      border-radius: 12px;
+      padding: 14px 8px;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      color: var(--cream);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--sand);
+      margin-top: 4px;
+      letter-spacing: .5px;
+    }
+
+    .progress-bar-wrap { margin: 16px 0 0; position: relative; }
+
+    .progress-bar-bg {
+      height: 8px;
+      background: rgba(245,234,216,.15);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--stamp-gold);
+      border-radius: 20px;
+      transition: width .6s cubic-bezier(.4,0,.2,1);
+    }
+
+    .progress-label {
+      font-size: 12px;
+      color: var(--sand);
+      margin-top: 6px;
+      text-align: right;
+      position: relative;
+    }
+
+    .stamps-section h3 {
+      font-family: 'Playfair Display', serif;
+      color: var(--espresso);
+      font-size: 18px;
+      margin-bottom: 14px;
+    }
+
+    .stamps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+      gap: 10px;
+    }
+
+    .stamp-item {
+      background: var(--foam);
+      border: 2px dashed rgba(122,63,37,.2);
+      border-radius: 14px;
+      padding: 12px 6px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+    }
+
+    .stamp-item:hover { border-color: var(--espresso); transform: translateY(-1px); }
+
+    .stamp-item.stamped {
+      background: var(--espresso);
+      border: 2px solid var(--stamp-gold);
+      box-shadow: 0 4px 12px rgba(122,63,37,.3);
+    }
+
+    .stamp-item.stamped::after {
+      content: '✓';
+      position: absolute;
+      top: -6px; right: -6px;
+      width: 18px; height: 18px;
+      background: var(--stamp-gold);
+      border-radius: 50%;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      line-height: 18px;
+    }
+
+    .stamp-emoji { font-size: 26px; display: block; margin-bottom: 5px; }
+
+    .stamp-name {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--espresso);
+      line-height: 1.3;
+    }
+
+    .stamp-item.stamped .stamp-name { color: var(--cream); }
+
+    .stamp-date { font-size: 9px; color: var(--sand); margin-top: 3px; }
+
+    /* ── REWARDS ── */
+    .rewards-section { margin-top: 24px; }
+
+    .rewards-section h3 {
+      font-family: 'Playfair Display', serif;
+      color: var(--espresso);
+      font-size: 18px;
+      margin-bottom: 14px;
+    }
+
+    .reward-card {
+      background: var(--foam);
+      border: 1.5px solid rgba(122,63,37,.15);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: transform .15s;
+    }
+
+    .reward-card:hover { transform: translateY(-1px); }
+
+    .reward-icon { font-size: 32px; flex-shrink: 0; }
+    .reward-info { flex: 1; }
+
+    .reward-title { font-weight: 600; color: var(--dark); font-size: 15px; }
+
+    .reward-desc { font-size: 13px; color: var(--espresso); opacity: .7; margin-top: 2px; }
+
+    .reward-badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .reward-badge.locked { background: rgba(122,63,37,.1); color: var(--espresso); }
+    .reward-badge.unlocked { background: var(--stamp-gold); color: white; }
+
+    /* ── CAFE DETAIL MODAL ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(62,31,14,.5);
+      z-index: 2000;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s;
+    }
+
+    .overlay.open { opacity: 1; pointer-events: all; }
+
+    .cafe-sheet {
+      background: var(--foam);
+      border-radius: 24px 24px 0 0;
+      padding: 24px 20px 32px;
+      width: 100%;
+      max-width: 700px;
+      max-height: 85vh;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+    }
+
+    .overlay.open .cafe-sheet { transform: translateY(0); }
+
+    .sheet-handle {
+      width: 40px; height: 4px;
+      background: rgba(122,63,37,.2);
+      border-radius: 2px;
+      margin: 0 auto 18px;
+    }
+
+    .sheet-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .sheet-header h2 {
+      font-family: 'Playfair Display', serif;
+      color: var(--dark);
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    .sheet-close {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: rgba(122,63,37,.1);
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--espresso);
+      transition: background .2s;
+    }
+
+    .sheet-close:hover { background: rgba(122,63,37,.2); }
+
+    .sheet-address {
+      font-size: 13px;
+      color: var(--espresso);
+      opacity: .7;
+      margin-bottom: 20px;
+    }
+
+    .sheet-gmaps-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--espresso);
+      text-decoration: none;
+      margin-bottom: 20px;
+      padding: 8px 14px;
+      border-radius: 20px;
+      background: var(--warm);
+      border: 1.5px solid rgba(122,63,37,.15);
+      transition: background .2s;
+    }
+
+    .sheet-gmaps-link:hover { background: var(--sand); }
+
+    .sheet-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--espresso);
+      opacity: .5;
+      margin-bottom: 10px;
+    }
+
+    .menu-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+
+    .menu-tag {
+      background: var(--warm);
+      border: 1.5px solid rgba(122,63,37,.15);
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: var(--espresso);
+      font-weight: 500;
+    }
+
+    .hours-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(122,63,37,.08);
+      font-size: 13px;
+      color: var(--dark);
+    }
+
+    .hours-row .day { color: var(--espresso); opacity: .7; }
+    .hours-open { color: var(--green); font-weight: 600; }
+
+    .checkin-btn {
+      width: 100%;
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      letter-spacing: .5px;
+    }
+
+    .checkin-btn.unstamped { background: var(--espresso); color: var(--cream); }
+    .checkin-btn.unstamped:hover { background: var(--dark); transform: translateY(-1px); }
+    .checkin-btn.stamped { background: var(--stamp-gold); color: white; }
+    .checkin-btn.visited { background: rgba(122,63,37,.1); color: var(--espresso); cursor: default; }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--espresso);
+      color: var(--cream);
+      padding: 14px 22px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 9999;
+      transition: transform .35s cubic-bezier(.4,0,.2,1);
+      white-space: nowrap;
+      box-shadow: 0 8px 24px rgba(62,31,14,.25);
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── CONFIG NOTICE ── */
+    .config-notice {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 12px 16px 0;
+      font-size: 13px;
+      color: #856404;
+      display: none;
+    }
+
+    .config-notice.show { display: block; }
+
+    /* ── PROFILE SETUP SCREEN ── */
+    .profile-screen {
+      position: fixed;
+      inset: 0;
+      background: rgba(62,31,14,.72);
+      backdrop-filter: blur(3px);
+      z-index: 9998;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .profile-screen.show { display: flex; }
+
+    .profile-card {
+      background: var(--foam);
+      border-radius: 24px;
+      padding: 30px 26px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 50px rgba(62,31,14,.4);
+      text-align: center;
+    }
+
+    .profile-icon { font-size: 44px; margin-bottom: 8px; }
+
+    .profile-title {
+      font-family: 'Playfair Display', serif;
+      color: var(--dark);
+      font-size: 20px;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .profile-subtitle {
+      font-size: 13px;
+      color: var(--espresso);
+      opacity: .7;
+      margin-bottom: 24px;
+    }
+
+    .profile-field { text-align: left; margin-bottom: 16px; }
+
+    .profile-field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--espresso);
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .profile-field select,
+    .profile-field input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 2px solid rgba(122,63,37,.2);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: var(--dark);
+      background: white;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .profile-field select:focus,
+    .profile-field input:focus { border-color: var(--espresso); }
+
+    .profile-submit-btn {
+      width: 100%;
+      margin-top: 6px;
+      padding: 14px;
+      border-radius: 14px;
+      border: none;
+      background: var(--espresso);
+      color: var(--cream);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      letter-spacing: .5px;
+    }
+
+    .profile-submit-btn:hover { background: var(--dark); transform: translateY(-1px); }
+
+    /* ── PASSPORT ID CARD ── */
+    .passport-id-card {
+      background: linear-gradient(135deg, var(--foam), var(--warm));
+      border: 2px solid var(--espresso);
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .passport-id-card::before {
+      content: '☕';
+      position: absolute;
+      top: -18px;
+      right: -14px;
+      font-size: 90px;
+      opacity: .06;
+      transform: rotate(-12deg);
+    }
+
+    .id-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+      border-bottom: 1.5px dashed rgba(122,63,37,.3);
+      position: relative;
+    }
+
+    .id-card-country {
+      font-family: 'Playfair Display', serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--dark);
+      letter-spacing: 1px;
+    }
+
+    .id-card-type {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--espresso);
+      letter-spacing: 1px;
+      background: rgba(122,63,37,.1);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .id-card-body {
+      display: flex;
+      gap: 16px;
+      position: relative;
+    }
+
+    .id-photo {
+      flex-shrink: 0;
+      width: 76px;
+      height: 92px;
+      background: #d9d1c2;
+      border: 2px solid rgba(122,63,37,.3);
+      border-radius: 8px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .id-photo svg { width: 100%; height: 100%; }
+
+    .id-fields {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    .id-field { display: flex; flex-direction: column; gap: 1px; }
+
+    .id-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--espresso);
+      opacity: .55;
+    }
+
+    .id-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--dark);
+      overflow-wrap: break-word;
+    }
+
+    .id-card-mrz {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1.5px dashed rgba(122,63,37,.3);
+      font-family: monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: rgba(122,63,37,.4);
+      white-space: nowrap;
+      overflow: hidden;
+      position: relative;
+    }
+
+    @media (max-width: 480px) {
+      .topbar h1 { font-size: 14px; }
+      .nav-tab { padding: 6px 10px; font-size: 12px; }
+      .stamps-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+      .user-btn span { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══ AUTH SCREEN ══ -->
+  <div class="auth-screen" id="auth-screen">
+    <div class="auth-logo">☕</div>
+    <h1 class="auth-title">PASAPORTE DEL CAFÉ</h1>
+    <div class="auth-subtitle">HERMOSILLO, SONORA</div>
+
+    <div class="auth-card">
+      <p>Inicia sesión con tu cuenta de Google para guardar tu progreso y acceder desde cualquier dispositivo.</p>
+
+      <button class="google-btn" id="google-login-btn" onclick="signInWithGoogle()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Continuar con Google
+      </button>
+
+      <div class="auth-loading" id="auth-loading">
+        <div class="spinner"></div>
+        <span>Iniciando sesión…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PROFILE SETUP SCREEN (obligatorio la primera vez) ══ -->
+  <div class="profile-screen" id="profile-screen">
+    <div class="profile-card">
+      <div class="profile-icon">🛂</div>
+      <h1 class="profile-title">COMPLETA TU PASAPORTE</h1>
+      <div class="profile-subtitle">Cuéntanos un poco de ti antes de empezar</div>
+
+      <div class="profile-field">
+        <label for="profile-gender">Género</label>
+        <select id="profile-gender">
+          <option value="" disabled selected>Selecciona…</option>
+          <option value="Femenino">Femenino</option>
+          <option value="Masculino">Masculino</option>
+          <option value="Otro">Otro</option>
+          <option value="Prefiero no decir">Prefiero no decir</option>
+        </select>
+      </div>
+
+      <div class="profile-field">
+        <label for="profile-age">Edad</label>
+        <input id="profile-age" type="number" min="1" max="120" placeholder="Ej. 27"/>
+      </div>
+
+      <div class="profile-field">
+        <label for="profile-funfact">Fun fact tuyo</label>
+        <input id="profile-funfact" type="text" maxlength="80" placeholder="Ej. Le pongo canela a todo"/>
+      </div>
+
+      <button class="profile-submit-btn" onclick="submitProfile()">Guardar y continuar ☕</button>
+    </div>
+  </div>
+
+  <!-- CONFIG NOTICE (shown when Firebase not configured) -->
+  <div class="config-notice" id="config-notice">
+    ⚙️ <strong>Configuración requerida:</strong> Agrega tus credenciales de Firebase en el código (sección FIREBASE CONFIG) para activar el login con Google.
+    <a href="https://console.firebase.google.com" target="_blank" style="color:#856404;font-weight:600;">→ Crear proyecto Firebase</a>
+  </div>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <h1>☕ PASAPORTE</h1>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchPage('map', this)">Mapa</button>
+      <button class="nav-tab" onclick="switchPage('passport', this)">Mi Pasaporte</button>
+    </div>
+    <button class="user-btn" id="user-btn" onclick="toggleDropdown()">
+      <div class="user-avatar-placeholder" id="user-avatar-placeholder">?</div>
+      <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none"/>
+      <span id="user-name-short">Usuario</span>
+      <span class="sync-dot synced" id="sync-dot" title="Progreso guardado"></span>
+    </button>
+  </div>
+
+  <!-- USER DROPDOWN -->
+  <div class="user-dropdown" id="user-dropdown">
+    <div class="dropdown-header">
+      <div class="dropdown-name" id="dropdown-name">—</div>
+      <div class="dropdown-email" id="dropdown-email">—</div>
+    </div>
+    <div class="dropdown-item" onclick="closeDropdown()">
+      <span>☕</span> Mi progreso se guarda automáticamente
+    </div>
+    <div class="dropdown-item danger" onclick="signOut()">
+      <span>↩️</span> Cerrar sesión
+    </div>
+  </div>
+
+  <!-- MAP PAGE -->
+  <div class="page active map-page" id="page-map">
+    <div class="searchbar">
+      <input id="searchInput" type="text" placeholder="Buscar café…" autocomplete="off"/>
+      <button id="searchBtn">Buscar</button>
+      <div id="suggestions" class="suggestions"></div>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- PASSPORT PAGE -->
+  <div class="page passport-page" id="page-passport">
+
+    <!-- PASSPORT ID CARD -->
+    <div class="passport-id-card">
+      <div class="id-card-header">
+        <span class="id-card-country">PASAPORTE · HERMOSILLO</span>
+        <span class="id-card-type">CAFÉ ID</span>
+      </div>
+      <div class="id-card-body">
+        <div class="id-photo">
+          <svg viewBox="0 0 76 92" xmlns="http://www.w3.org/2000/svg">
+            <rect width="76" height="92" fill="#d9d1c2"/>
+            <circle cx="38" cy="34" r="16" fill="#9b8a72"/>
+            <path d="M4 92 C4 66 20 56 38 56 C56 56 72 66 72 92 Z" fill="#9b8a72"/>
+          </svg>
+        </div>
+        <div class="id-fields">
+          <div class="id-field">
+            <span class="id-label">Nombre</span>
+            <span class="id-value" id="id-name">—</span>
+          </div>
+          <div class="id-field">
+            <span class="id-label">Género</span>
+            <span class="id-value" id="id-gender">—</span>
+          </div>
+          <div class="id-field">
+            <span class="id-label">Edad</span>
+            <span class="id-value" id="id-age">—</span>
+          </div>
+          <div class="id-field">
+            <span class="id-label">Fun Fact</span>
+            <span class="id-value" id="id-funfact">—</span>
+          </div>
+        </div>
+      </div>
+      <div class="id-card-mrz" id="id-mrz">P&lt;HMO&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div>
+    </div>
+
+    <div class="passport-cover">
+      <h2>PASAPORTE DEL CAFÉ</h2>
+      <div class="subtitle">HERMOSILLO, SONORA</div>
+      <div class="passport-stats">
+        <div class="stat-box">
+          <div class="stat-num" id="stat-visited">0</div>
+          <div class="stat-label">Visitados</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-total">33</div>
+          <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-pct">0%</div>
+          <div class="stat-label">Completado</div>
+        </div>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+        <div class="progress-label" id="progress-label">0 de 33 sellos</div>
+      </div>
+    </div>
+    <div class="rewards-section">
+      <h3>Recompensas</h3>
+      <div id="rewards-list"></div>
+    </div>
+    <div class="stamps-section" style="margin-top:24px;">
+      <h3>Mis Sellos</h3>
+      <div class="stamps-grid" id="stamps-grid"></div>
+    </div>
+  </div>
+
+  <!-- CAFE DETAIL SHEET -->
+  <div class="overlay" id="overlay" onclick="closeSheet(event)">
+    <div class="cafe-sheet" id="cafe-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h2 id="sheet-name">—</h2>
+        <button class="sheet-close" onclick="closeOverlay()">✕</button>
+      </div>
+      <div class="sheet-address" id="sheet-address">📍 —</div>
+      <a class="sheet-gmaps-link" id="sheet-gmaps-link" href="#" target="_blank" rel="noopener">🔎 Buscar en Google</a>
+      <div class="sheet-section-title">Especialidades</div>
+      <div class="menu-tags" id="sheet-menu"></div>
+      <div class="sheet-section-title">Horarios</div>
+      <div id="sheet-hours"></div>
+      <button class="checkin-btn" id="checkin-btn" onclick="doCheckin()">Registrar Visita ☕</button>
+    </div>
+  </div>
+
+  <!-- VERIFY MODAL -->
+  <div class="overlay" id="verify-overlay" onclick="closeVerify(event)">
+    <div class="cafe-sheet" id="verify-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h2>Verificar visita</h2>
+        <button class="sheet-close" onclick="closeVerifyOverlay()">✕</button>
+      </div>
+
+  <div id="verify-code">
+  <button class="checkin-btn unstamped" style="margin-bottom:14px;" onclick="startQrScan()">📷 Escanear código QR</button>
+
+  <div id="qr-scanner-wrap" style="display:none;margin-bottom:14px;">
+    <video id="qr-video" playsinline muted style="width:100%;border-radius:12px;background:#000;display:block;"></video>
+    <canvas id="qr-canvas" style="display:none;"></canvas>
+    <div id="qr-status" style="font-size:12px;color:var(--espresso);opacity:.7;text-align:center;margin-top:8px;">
+      Apunta la cámara al código QR del café ☕
+    </div>
+    <button class="checkin-btn"
+            style="margin-top:8px;background:rgba(122,63,37,.1);color:var(--espresso);"
+            onclick="stopQrScan()">
+      Cancelar escaneo
+    </button>
+  </div>
+
+  <div style="text-align:center;font-size:12px;color:var(--espresso);opacity:.5;margin:10px 0;">
+    — o ingresa el código manualmente —
+  </div>
+
+  <input id="code-input"
+         type="text"
+         placeholder="Ingresa el código del café"
+         style="width:100%;padding:14px;border-radius:12px;border:2px solid rgba(122,63,37,.25);font-size:16px;text-align:center;"/>
+
+  <button class="checkin-btn unstamped"
+          style="margin-top:12px;"
+          onclick="confirmFromCode()">
+    ✓ Confirmar
+  </button>
+</div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    // ══════════════════════════════════════════════════
+    // FIREBASE CONFIG — Reemplaza con tus credenciales
+    // Ve a https://console.firebase.google.com
+    // Crea un proyecto → Agrega app web → copia config
+    // Activa Authentication → Google como proveedor
+    // Activa Firestore Database
+    // ══════════════════════════════════════════════════
+    const FIREBASE_CONFIG = {
+      apiKey:            "AIzaSyA_aYk4M5bQD4Z15EOAPo0YTpqDZhq3dj4",
+      authDomain:        "pasaporte-del-cafe-d5df9.firebaseapp.com",
+      projectId:         "pasaporte-del-cafe-d5df9",
+      storageBucket:     "pasaporte-del-cafe-d5df9.firebasestorage.app",
+      messagingSenderId: "429826556683",
+      appId:             "1:429826556683:web:0be975bc413c303f20180e",
+      measurementId:     "G-3LHQFKQY7H"
+    };
+    // ══════════════════════════════════════════════════
+
+    const CONFIGURED = !FIREBASE_CONFIG.apiKey.startsWith("TU_");
+
+    import { initializeApp }                      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
+                                                  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot }
+                                                  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    let app, auth, db, provider, currentUser = null, unsubscribeSnapshot = null;
+
+    if (CONFIGURED) {
+      app      = initializeApp(FIREBASE_CONFIG);
+      auth     = getAuth(app);
+      db       = getFirestore(app);
+      provider = new GoogleAuthProvider();
+    } else {
+      // Not configured — show notice and fallback to localStorage
+      document.getElementById('config-notice').classList.add('show');
+      document.getElementById('auth-screen').classList.add('hidden');
+      setupUIWithLocalStorage();
+    }
+
+    // ── Sign in ──
+    window.signInWithGoogle = async function() {
+      if (!CONFIGURED) { document.getElementById('auth-screen').classList.add('hidden'); return; }
+      document.getElementById('google-login-btn').style.display = 'none';
+      document.getElementById('auth-loading').classList.add('show');
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (e) {
+        console.error(e);
+        document.getElementById('google-login-btn').style.display = 'flex';
+        document.getElementById('auth-loading').classList.remove('show');
+        showToast('Error al iniciar sesión. Intenta de nuevo.');
+      }
+    };
+
+    // ── Sign out ──
+    window.signOut = async function() {
+      closeDropdown();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      if (CONFIGURED && auth) await fbSignOut(auth);
+      else { localStorage.removeItem('cafeVisited'); }
+      visited = {};
+      currentUser = null;
+      updateUserUI(null);
+      refreshMarkers();
+      document.getElementById('auth-screen').classList.remove('hidden');
+    };
+
+    // ── Auth state ──
+    if (CONFIGURED) {
+      onAuthStateChanged(auth, async user => {
+        if (user) {
+          currentUser = user;
+          updateUserUI(user);
+          document.getElementById('auth-screen').classList.add('hidden');
+          await loadUserData(user.uid);
+          setupRealtimeSync(user.uid);
+          initMap();
+        } else {
+          currentUser = null;
+          updateUserUI(null);
+          document.getElementById('auth-screen').classList.remove('hidden');
+        }
+      });
+    }
+
+    // ── Firestore: load data ──
+    async function loadUserData(uid) {
+      setSyncDot('syncing');
+      try {
+        const ref  = doc(db, 'users', uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          visited = snap.data().visited || {};
+          profile = snap.data().profile || null;
+        } else {
+          // New user — always start at zero
+          visited = {};
+          profile = null;
+          await setDoc(ref, { visited: {}, profile: null, email: currentUser.email, name: currentUser.displayName });
+        }
+        setSyncDot('synced');
+        refreshMarkers();
+        if (window.checkProfileScreen) window.checkProfileScreen();
+      } catch (e) {
+        console.error(e);
+        setSyncDot('');
+      }
+    }
+
+    // ── Firestore: real-time listener ──
+    function setupRealtimeSync(uid) {
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      const ref = doc(db, 'users', uid);
+      unsubscribeSnapshot = onSnapshot(ref, snap => {
+        if (snap.exists()) {
+          visited = snap.data().visited || {};
+          profile = snap.data().profile || null;
+          refreshMarkers();
+          const activePage = document.querySelector('.nav-tab.active');
+          if (activePage && activePage.textContent === 'Mi Pasaporte') renderPassport();
+        }
+      });
+    }
+
+    // ── Firestore: save check-in ──
+    window.saveCheckin = async function(cafeName, dateStr) {
+      setSyncDot('syncing');
+      try {
+        if (CONFIGURED && currentUser) {
+          const ref = doc(db, 'users', currentUser.uid);
+          await updateDoc(ref, { [`visited.${safeFbKey(cafeName)}`]: dateStr });
+        } else {
+          localStorage.setItem('cafeVisited', JSON.stringify(visited));
+        }
+        setSyncDot('synced');
+      } catch (e) {
+        // If doc doesn't exist yet, create it
+        try {
+          const ref = doc(db, 'users', currentUser.uid);
+          await setDoc(ref, { visited, email: currentUser.email, name: currentUser.displayName });
+          setSyncDot('synced');
+        } catch (e2) { console.error(e2); setSyncDot(''); }
+      }
+    };
+
+    // ── Firestore: save profile ──
+    window.saveProfile = async function(profileData) {
+      setSyncDot('syncing');
+      try {
+        if (CONFIGURED && currentUser) {
+          const ref = doc(db, 'users', currentUser.uid);
+          await updateDoc(ref, { profile: profileData });
+        } else {
+          localStorage.setItem('cafeProfile', JSON.stringify(profileData));
+        }
+        setSyncDot('synced');
+      } catch (e) {
+        try {
+          const ref = doc(db, 'users', currentUser.uid);
+          await setDoc(ref, { visited, profile: profileData, email: currentUser.email, name: currentUser.displayName }, { merge: true });
+          setSyncDot('synced');
+        } catch (e2) { console.error(e2); setSyncDot(''); }
+      }
+    };
+
+    // Firestore keys can't have slashes — replace with unicode lookalike
+    function safeFbKey(str) { return str.replace(/\//g, '∕'); }
+
+    // ── Fallback: no Firebase ──
+    function setupUIWithLocalStorage() {
+      visited = JSON.parse(localStorage.getItem('cafeVisited') || '{}');
+      profile = JSON.parse(localStorage.getItem('cafeProfile') || 'null');
+      window.saveCheckin = function(cafeName) {
+        localStorage.setItem('cafeVisited', JSON.stringify(visited));
+      };
+      window.saveProfile = function(profileData) {
+        profile = profileData;
+        localStorage.setItem('cafeProfile', JSON.stringify(profileData));
+      };
+      updateUserUI({ displayName:'Invitado', email:'Sin cuenta', photoURL: null });
+      initMap();
+      if (window.checkProfileScreen) window.checkProfileScreen();
+    }
+
+    // ── Update topbar user UI ──
+    function updateUserUI(user) {
+      const placeholder = document.getElementById('user-avatar-placeholder');
+      const img         = document.getElementById('user-avatar');
+      const nameShort   = document.getElementById('user-name-short');
+      const ddName      = document.getElementById('dropdown-name');
+      const ddEmail     = document.getElementById('dropdown-email');
+
+      if (!user) {
+        placeholder.textContent = '?';
+        placeholder.style.display = 'flex';
+        img.style.display = 'none';
+        nameShort.textContent = 'Usuario';
+        ddName.textContent = '—';
+        ddEmail.textContent = '—';
+        window.currentDisplayName = 'Usuario';
+        return;
+      }
+
+      window.currentDisplayName = user.displayName || 'Usuario';
+      const first = (user.displayName || 'Usuario').split(' ')[0];
+      nameShort.textContent = first;
+      ddName.textContent    = user.displayName || 'Usuario';
+      ddEmail.textContent   = user.email || '';
+
+      if (user.photoURL) {
+        img.src = user.photoURL;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+      } else {
+        placeholder.textContent = first[0].toUpperCase();
+        placeholder.style.display = 'flex';
+        img.style.display = 'none';
+      }
+    }
+
+    function setSyncDot(state) {
+      const dot = document.getElementById('sync-dot');
+      dot.className = 'sync-dot';
+      if (state) dot.classList.add(state);
+    }
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+  <script>
+    // ──────────────────────────────────────────────
+    // DATA
+    // ──────────────────────────────────────────────
+    const cafes = [
+      { name:"211 Barra Café", address:"C. Benito Juárez 211, Issste Federal", coords:[29.105567,-110.952852], menu:["Espresso","Cappuccino","Té","Pasteles"], hours:{lun:"8–20",mar:"8–20",mie:"8–20",jue:"8–20",vie:"8–21",sab:"9–21",dom:"10–18"} },
+      { name:"Ágape Café", address:"Av. Saturnino Campoy 869-GG, Álvaro Obregón", coords:[29.103832,-111.006329], menu:["Cold Brew","Latte","Sándwiches","Waffles"], hours:{lun:"8–21",mar:"8–21",mie:"8–21",jue:"8–21",vie:"8–22",sab:"9–22",dom:"10–19"} },
+      { name:"Aletto Café", address:"Av. Dr. Ignacio Pesqueira 608-A, Las Quintas", coords:[29.084816,-110.991711], menu:["V60","Aeropress","Croissants","Matcha"], hours:{lun:"8–20",mar:"8–20",mie:"8–20",jue:"8–20",vie:"8–21",sab:"9–20",dom:"10–17"} },
+      { name:"Café Central", address:"Blvd. Miguel Hidalgo 63, El Centenario", coords:[29.076014,-110.961434], menu:["Americano","Café de Olla","Pan de Dulce"], hours:{lun:"7–21",mar:"7–21",mie:"7–21",jue:"7–21",vie:"7–22",sab:"8–22",dom:"9–18"} },
+      { name:"Cafelita", address:"Av. Tehuantepec 53, El Centenario", coords:[29.073757,-110.959006], menu:["Espresso","Muffins","Licuados","Tés"], hours:{lun:"8–20",mar:"8–20",mie:"8–20",jue:"8–20",vie:"8–21",sab:"9–21",dom:"9–17"} },
+      { name:"ROOCÖ Café", address:"Plaza Navarrete Local 22, Montebello", coords:[29.089559,-110.990957], menu:["Specialty Coffee","Tapioca","Matcha Latte"], hours:{lun:"9–21",mar:"9–21",mie:"9–21",jue:"9–21",vie:"9–22",sab:"10–22",dom:"10–19"} },
+      { name:"Flor del Desierto Café", address:"Banús 4D, Insurgentes", coords:[29.144872,-110.961260], menu:["Cold Brew","Frappé","Tamales","Pan"], hours:{lun:"8–20",mar:"8–20",mie:"8–20",jue:"8–20",vie:"8–21",sab:"9–20",dom:"Cerrado"} },
+      { name:"Clarity - Brew Bar", address:"Av. San Luis Potosí 211-B, San Benito", coords:[29.089694,-110.965569], menu:["Pour Over","Chemex","Filtrado","Pasteles"], hours:{lun:"8–19",mar:"8–19",mie:"8–19",jue:"8–19",vie:"8–20",sab:"9–20",dom:"10–15"} },
+      { name:"Colibrí Café", address:"Segunda de Obregón 140, El Centenario", coords:[29.077396,-110.958316], menu:["Café Mexicano","Horchata","Burritos","Pan"], hours:{lun:"7–21",mar:"7–21",mie:"7–21",jue:"7–21",vie:"7–22",sab:"8–22",dom:"9–19"} },
+      { name:"Culto al Perro Café", address:"C. Quintero Arce 49, Montebello", coords:[29.089406,-111.007330], menu:["Espresso","Dog-Friendly","Galletas","Tés"], hours:{lun:"9–21",mar:"9–21",mie:"9–21",jue:"9–21",vie:"9–22",sab:"10–22",dom:"10–19"} },
+      { name:"Dante y Nova Café", address:"Pbro. Pedro Villegas Ramírez 2, Col del Razo", coords:[29.076618,-110.947631], menu:["Latte Art","Filtrados","Scones","Quiche"], hours:{lun:"8–20",mar:"8–20",mie:"8–20",jue:"8–20",vie:"8–21",sab:"9–21",dom:"10–18"} },
+      { name:"Dos Raíces Casa Tostadora", address:"Benito Quintana 20, Constitución", coords:[29.100452,-110.950297], menu:["Single Origin","Café Verde","Tostados","Granos"], hours:{lun:"9–19",mar:"9–19",mie:"9–19",jue:"9–19",vie:"9–20",sab:"10–18",dom:"Cerrado"} },
+      { name:"El Chapucero | Café", address:"Blvd. Miguel Hidalgo 60, El Centenario", coords:[29.075265,-110.961415], menu:["Americano","Brownies","Sandwich","Granola"], hours:{lun:"8–21",mar:"8–21",mie:"8–21",jue:"8–21",vie:"8–22",sab:"9–22",dom:"10–19"} },
+      { name:"El Idilio Café", address:"Av. Gastón Madrid 157-2, San Benito", coords:[29.088434,-110.963335], menu:["Latte","Avocado Toast","Smoothies","Matcha"], hours:{lun:"8–21",mar:"8–21",mie:"8–21",jue:"8–21",vie:"8–22",sab:"9–22",dom:"10–19"} },
+      { name:"Enclave Libros y Café", address:"Calle José María Yáñez 136A, Centro", coords:[29.080131,-110.956635], menu:["Café","Libros","Charlas","Tés"], hours:{lun:"9–21",mar:"9–21",mie:"9–21",jue:"9–21",vie:"9–22",sab:"10–22",dom:"10–20"} },
+      { name:"Griegos Cafe Grand Kino", address:"Blvd. Fco. Eusebio Kino 315, Country Club", coords:[29.097279,-110.938294], menu:["Gyros","Espresso","Tzatziki","Croissants"], hours:{lun:"8–21",mar:"8–21",mie:"8–21",jue:"8–21",vie:"8–22",sab:"9–22",dom:"10–18"} },
+      { name:"HORIZON COFFEE HOUSE", address:"Plaza Universidad, Blvd. Luis D. Colosio 158", coords:[29.079920,-110.963149], menu:["Pour Over","Batch Brew","Waffles","Granola"], hours:{lun:"8–21",mar:"8–21",mie:"8–21",jue:"8–21",vie:"8–22",sab:"9–22",dom:"10–20"} },
+      { name:"Josefina Cafe", address:"Av. Guillermo Prieto 22, Constitución", coords:[29.100127,-110.950148], menu:["Café de la Abuela","Pan Casero","Atole","Tamales"], hours:{lun:"7–20",mar:"7–20",mie:"7–20",jue:"7–20",vie:"7–21",sab:"8–21",dom:"9–17"} },
+      { name:"Maleducados", address:"Felicitas Zermeño 41, Centro", coords:[29.093250,-110.948298], menu:["Espresso","Cocteles Café","Pan Artesanal"], hours:{lun:"9–22",mar:"9–22",mie:"9–22",jue:"9–22",vie:"9–24",sab:"10–24",dom:"11–20"} },
+      { name:"MASALA CAFÉ", address:"Blvd. José María Morelos 389, Sacramento", coords:[29.129456,-110.951330], menu:["Chai Latte","Curry","Especias","Pan Pita"], hours:{lun:"9–21",mar:"9–21",mie:"9–21",jue:"9–21",vie:"9–22",sab:"10–22",dom:"10–19"} },
+      { name:"Café Modular", address:"La Jolla Ote. 90, Lomas Altas", coords:[29.107736,-110.936426], menu:["Cold Brew","Kombucha","Avocado Toast","Bowl"], hours:{lun:"8–21",mar:"8–21",mie:"8–21",jue:"8–21",vie:"8–22",sab:"9–22",dom:"10–19"} },
+      { name:"Órbita Anticafé", address:"C. Mina 37, Cerro de la Campana", coords:[29.074456,-110.955275], menu:["Tiempo Libre","Juegos","Café Incluido","Snacks"], hours:{lun:"10–22",mar:"10–22",mie:"10–22",jue:"10–22",vie:"10–24",sab:"11–24",dom:"11–21"} },
+      { name:"Perséfone Café", address:"Blvd. Valentín Gómez Farías 57-J, Periodista", coords:[29.104687,-110.949439], menu:["Filtrado","Espresso","Banana Bread","Brownies"], hours:{lun:"8–21",mar:"8–21",mie:"8–21",jue:"8–21",vie:"8–22",sab:"9–22",dom:"10–19"} },
+      { name:"Pura Vida - Cafeteria & Brunch", address:"Dr. Hoeffer 19, El Centenario", coords:[29.076335,-110.960077], menu:["Brunch","Smoothie Bowl","Tostadas","Jugos"], hours:{lun:"8–16",mar:"8–16",mie:"8–16",jue:"8–16",vie:"8–17",sab:"9–17",dom:"9–15"} },
+      { name:"Renacer Café", address:"Av. Tehuantepec 61, El Centenario", coords:[29.073682,-110.959915], menu:["Americano","Frappés","Repostería","Atole"], hours:{lun:"8–21",mar:"8–21",mie:"8–21",jue:"8–21",vie:"8–22",sab:"9–22",dom:"9–19"} },
+      { name:"Social Café", address:"Blvd. Luis Donaldo Colosio 914-L5, La Manga", coords:[29.081208,-111.030319], menu:["Cold Brew","Açaí Bowl","Tostadas","Matcha"], hours:{lun:"9–21",mar:"9–21",mie:"9–21",jue:"9–21",vie:"9–22",sab:"10–22",dom:"10–20"} },
+      { name:"Sonora Classic Rock Café", address:"C. Benito Juárez 431, Sacramento", coords:[29.119342,-110.952766], menu:["Americano","Hot Dog","Nachos","Cocteles"], hours:{lun:"Cerrado",mar:"14–23",mie:"14–23",jue:"14–23",vie:"14–01",sab:"14–01",dom:"14–21"} },
+      { name:"Tertulia Café", address:"Blvd. Valentín Gómez Farías 102, Periodista", coords:[29.108751,-110.949949], menu:["Filtrado","Charlas","Libros","Pan Artesanal"], hours:{lun:"9–21",mar:"9–21",mie:"9–21",jue:"9–21",vie:"9–22",sab:"10–22",dom:"10–19"} },
+      { name:"Tomomi Café", address:"C. Juan Aldama 13, San Benito", coords:[29.090454,-110.963957], menu:["Matcha","Mochi","Café Japonés","Onigiri"], hours:{lun:"9–21",mar:"9–21",mie:"9–21",jue:"9–21",vie:"9–22",sab:"10–22",dom:"10–19"} },
+      { name:"zanati coffee and tea house", address:"Oposura 153, Centro", coords:[29.073770,-110.955393], menu:["Té de Especialidad","Single Origin","Oolong","Pan"], hours:{lun:"9–21",mar:"9–21",mie:"9–21",jue:"9–21",vie:"9–22",sab:"10–22",dom:"10–20"} },
+      { name:"Casazul coffee and bakery", address:"Av. Campeche 1875, Bahía de Kino", coords:[28.861529,-112.008140], menu:["Pan Artesanal","Espresso","Pasteles","Jugos"], hours:{lun:"8–18",mar:"8–18",mie:"8–18",jue:"8–18",vie:"8–19",sab:"9–19",dom:"9–16"} },
+      { name:"Meri Meri Coffee Community", address:"Blvd. Manlio Fabio Beltrones 717, San Carlos", coords:[27.962812,-111.026543], menu:["Specialty Coffee","Malteadas","Pancakes","Tacos"], hours:{lun:"8–21",mar:"8–21",mie:"8–21",jue:"8–21",vie:"8–22",sab:"9–22",dom:"10–20"} },
+      { name:"PALOMINA COFFEE SHOP", address:"Los Pinitos, Sonora", coords:[29.235063,-110.887409], menu:["Café de Rancho","Atole","Pan Sonorense","Burritos"], hours:{lun:"7–19",mar:"7–19",mie:"7–19",jue:"7–19",vie:"7–20",sab:"8–20",dom:"8–17"} }
+    ];
+
+    const REWARDS = [
+      { id:'r1', title:'Primera Taza',       desc:'Visita tu primer café del pasaporte',       icon:'☕', need:1 },
+      { id:'r2', title:'Explorador Novato',  desc:'Visita 5 cafés diferentes',                 icon:'🗺️', need:5 },
+      { id:'r3', title:'Amante del Café',    desc:'Visita 10 cafés diferentes',                icon:'❤️', need:10 },
+      { id:'r4', title:'Pasaporte a Medias', desc:'Completa la mitad del pasaporte',           icon:'📖', need:Math.ceil(cafes.length/2) },
+      { id:'r5', title:'Gran Explorador',    desc:'Visita 25 cafés del pasaporte',             icon:'🏆', need:25 },
+      { id:'r6', title:'Pasaporte Completo', desc:'¡Visita todos los cafés asociados!',        icon:'⭐', need:cafes.length }
+    ];
+
+    // ──────────────────────────────────────────────
+    // STATE
+    // ──────────────────────────────────────────────
+    let visited = {};
+    let profile = null;
+    let currentCafe = null;
+    let mapInitialized = false;
+    let markersByName = new Map();
+    let mapInstance = null;
+    let qrStream = null;
+    let qrAnimationId = null;
+
+    function visitedCount() { return Object.keys(visited).length; }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    // ──────────────────────────────────────────────
+    // PAGE NAVIGATION
+    // ──────────────────────────────────────────────
+    function switchPage(id, btn) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('page-' + id).classList.add('active');
+      if (btn) btn.classList.add('active');
+      if (id === 'passport') renderPassport();
+      if (id === 'map' && mapInstance) setTimeout(() => mapInstance.invalidateSize(), 100);
+    }
+
+    // ──────────────────────────────────────────────
+    // PROFILE (cuestionario obligatorio)
+    // ──────────────────────────────────────────────
+    function checkProfileScreen() {
+      const complete = profile && profile.gender && profile.age && profile.funFact;
+      if (!complete) {
+        document.getElementById('profile-screen').classList.add('show');
+      } else {
+        document.getElementById('profile-screen').classList.remove('show');
+        updatePassportIdCard();
+      }
+    }
+    window.checkProfileScreen = checkProfileScreen;
+
+    function submitProfile() {
+      const gender  = document.getElementById('profile-gender').value;
+      const age     = document.getElementById('profile-age').value;
+      const funFact = document.getElementById('profile-funfact').value.trim();
+
+      if (!gender || !age || !funFact) {
+        showToast('Completa todos los campos ✏️');
+        return;
+      }
+
+      profile = { gender, age, funFact };
+      if (window.saveProfile) window.saveProfile(profile);
+      document.getElementById('profile-screen').classList.remove('show');
+      updatePassportIdCard();
+      showToast('¡Perfil guardado! 🛂');
+    }
+    window.submitProfile = submitProfile;
+
+    function updatePassportIdCard() {
+      const name = window.currentDisplayName || 'Invitado';
+      document.getElementById('id-name').textContent    = name;
+      document.getElementById('id-gender').textContent  = profile ? profile.gender  : '—';
+      document.getElementById('id-age').textContent     = profile ? profile.age     : '—';
+      document.getElementById('id-funfact').textContent = profile ? profile.funFact : '—';
+
+      const mrzName = normalize(name).toUpperCase().replace(/[^A-Z]/g, '<');
+      const mrz = ('P<HMO' + mrzName).padEnd(30, '<').slice(0, 30);
+      document.getElementById('id-mrz').textContent = mrz;
+    }
+
+    // ──────────────────────────────────────────────
+    // DROPDOWN
+    // ──────────────────────────────────────────────
+    function toggleDropdown() {
+      document.getElementById('user-dropdown').classList.toggle('open');
+    }
+
+    function closeDropdown() {
+      document.getElementById('user-dropdown').classList.remove('open');
+    }
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#user-btn') && !e.target.closest('#user-dropdown')) {
+        closeDropdown();
+      }
+    });
+
+    // ──────────────────────────────────────────────
+    // MAP
+    // ──────────────────────────────────────────────
+    window.initMap = function() {
+      if (mapInitialized) return;
+      mapInitialized = true;
+
+      const map = L.map('map', { minZoom:12, maxZoom:18 }).setView([29.072967,-110.955919], 13);
+      mapInstance = map;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        minZoom:12, maxZoom:18,
+        attribution:'&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      const cafeIcon = L.divIcon({
+        className:'',
+        html:'<div style="font-size:36px;line-height:1;filter:drop-shadow(0 4px 8px rgba(0,0,0,.22));">📍</div>',
+        iconSize:[40,40], iconAnchor:[20,38], popupAnchor:[0,-38]
+      });
+
+      const visitedIcon = L.divIcon({
+        className:'',
+        html:'<div style="font-size:36px;line-height:1;filter:drop-shadow(0 4px 8px rgba(0,0,0,.22));">✅</div>',
+        iconSize:[40,40], iconAnchor:[20,38], popupAnchor:[0,-38]
+      });
+
+      cafes.forEach(c => {
+        const marker = L.marker(c.coords, { icon: visited[c.name] ? visitedIcon : cafeIcon })
+          .addTo(map)
+          .bindPopup(
+            '<b>' + c.name + '</b><br><small>' + c.address + '</small><br><br>' +
+            '<a href="#" onclick="openCafeSheet(\'' + encodeURIComponent(c.name) + '\');return false;" style="color:#7a3f25;font-weight:600;">Ver detalles →</a>'
+          );
+        markersByName.set(normalize(c.name), { cafe:c, marker, cafeIcon, visitedIcon });
+      });
+
+      setTimeout(() => map.invalidateSize(), 250);
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const userCoords = [pos.coords.latitude, pos.coords.longitude];
+          L.circleMarker(userCoords, { radius:7, color:'#2b7cff', fillColor:'#2b7cff', fillOpacity:.9 })
+            .addTo(map).bindPopup('Tu ubicación 📍');
+          map.setView(userCoords, 15);
+        }, () => {}, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+      }
+
+      // Search
+      const input = document.getElementById('searchInput');
+      const btnEl = document.getElementById('searchBtn');
+      const suggestions = document.getElementById('suggestions');
+
+      function showSuggestions(list) {
+        suggestions.innerHTML = '';
+        if (!list.length) { suggestions.style.display='none'; return; }
+        list.slice(0,6).forEach(c => {
+          const d = document.createElement('div');
+          d.className = 'suggestion';
+          d.textContent = c.name + (visited[c.name] ? ' ✓' : '');
+          d.onclick = () => { input.value=c.name; suggestions.style.display='none'; goToCafe(c.name); };
+          suggestions.appendChild(d);
+        });
+        suggestions.style.display='block';
+      }
+
+      function goToCafe(query) {
+        const q = normalize(query);
+        if (!q) return;
+        const obj = markersByName.get(q) || (() => {
+          const found = cafes.find(c => normalize(c.name).includes(q));
+          return found ? markersByName.get(normalize(found.name)) : null;
+        })();
+        if (obj) { map.setView(obj.cafe.coords, 17); obj.marker.openPopup(); }
+        else alert('No encontré ese café.');
+      }
+
+      input.addEventListener('input', () => {
+        const q = normalize(input.value);
+        if (!q) { suggestions.style.display='none'; return; }
+        showSuggestions(cafes.filter(c => normalize(c.name).includes(q)));
+      });
+
+      input.addEventListener('keydown', e => {
+        if (e.key==='Enter') { suggestions.style.display='none'; goToCafe(input.value); }
+      });
+
+      btnEl.addEventListener('click', () => { suggestions.style.display='none'; goToCafe(input.value); });
+
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.searchbar')) suggestions.style.display='none';
+      });
+    };
+
+    // ──────────────────────────────────────────────
+    // MARKER REFRESH
+    // ──────────────────────────────────────────────
+    function refreshMarkers() {
+      markersByName.forEach(({ cafe, marker, cafeIcon, visitedIcon }) => {
+        marker.setIcon(visited[cafe.name] ? visitedIcon : cafeIcon);
+      });
+    }
+
+    // ──────────────────────────────────────────────
+    // CAFE DETAIL SHEET
+    // ──────────────────────────────────────────────
+    window.openCafeSheet = function(encodedName) {
+      const name = decodeURIComponent(encodedName);
+      const cafe = cafes.find(c => c.name === name);
+      if (!cafe) return;
+      currentCafe = cafe;
+
+      document.getElementById('sheet-name').textContent = cafe.name;
+      document.getElementById('sheet-address').textContent = '📍 ' + cafe.address;
+
+      const gmapsQuery = encodeURIComponent(cafe.name + ', ' + cafe.address + ', Hermosillo, Sonora');
+      document.getElementById('sheet-gmaps-link').href = 'https://www.google.com/search?q=' + gmapsQuery;
+
+      document.getElementById('sheet-menu').innerHTML =
+        cafe.menu.map(m => `<span class="menu-tag">${m}</span>`).join('');
+
+      const dayNames = { lun:'Lun', mar:'Mar', mie:'Mié', jue:'Jue', vie:'Vie', sab:'Sáb', dom:'Dom' };
+      document.getElementById('sheet-hours').innerHTML =
+        Object.entries(cafe.hours).map(([d,h]) =>
+          `<div class="hours-row"><span class="day">${dayNames[d]}</span><span class="${h==='Cerrado'?'':'hours-open'}">${h}</span></div>`
+        ).join('');
+
+      const btn = document.getElementById('checkin-btn');
+      const v = visited[cafe.name];
+      if (v) {
+        btn.textContent = '✓ Visitado el ' + v;
+        btn.className = 'checkin-btn visited';
+      } else {
+        btn.textContent = 'Registrar Visita ☕';
+        btn.className = 'checkin-btn unstamped';
+      }
+
+      document.getElementById('overlay').classList.add('open');
+    };
+
+    function closeOverlay() {
+      document.getElementById('overlay').classList.remove('open');
+    }
+
+    function closeSheet(e) {
+      if (e.target === document.getElementById('overlay')) closeOverlay();
+    }
+
+window.doCheckin = function() {
+  if (!currentCafe) return;
+  if (visited[currentCafe.name]) return;
+
+  document.getElementById('code-input').value = '';
+  document.getElementById('qr-scanner-wrap').style.display = 'none';
+  document.getElementById('verify-overlay').classList.add('open');
+
+  setTimeout(() => {
+    document.getElementById('code-input').focus();
+  }, 100);
+};
+
+  
+
+  function closeVerifyOverlay() {
+  stopQrScan();
+  document.getElementById('verify-overlay').classList.remove('open');
+}
+
+function closeVerify(e) {
+  if (e.target === document.getElementById('verify-overlay')) {
+    closeVerifyOverlay();
+  }
+}
+
+// ──────────────────────────────────────────────
+// ESCÁNER QR (usa jsQR + cámara del dispositivo)
+// ──────────────────────────────────────────────
+function startQrScan() {
+  const wrap  = document.getElementById('qr-scanner-wrap');
+  const video = document.getElementById('qr-video');
+  const status = document.getElementById('qr-status');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast('Tu navegador no soporta cámara ❌');
+    return;
+  }
+
+  wrap.style.display = 'block';
+  status.textContent = 'Apunta la cámara al código QR del café ☕';
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(stream => {
+      qrStream = stream;
+      video.srcObject = stream;
+      video.play();
+      qrAnimationId = requestAnimationFrame(scanQrFrame);
+    })
+    .catch(err => {
+      console.error(err);
+      showToast('No se pudo acceder a la cámara ❌');
+      wrap.style.display = 'none';
+    });
+}
+window.startQrScan = startQrScan;
+
+function scanQrFrame() {
+  const video  = document.getElementById('qr-video');
+  const canvas = document.getElementById('qr-canvas');
+  if (!video || !qrStream) return;
+
+  if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+    qrAnimationId = requestAnimationFrame(scanQrFrame);
+    return;
+  }
+
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const result = jsQR(imageData.data, imageData.width, imageData.height, {
+    inversionAttempts: 'dontInvert'
+  });
+
+  if (result && result.data) {
+    handleQrResult(result.data);
+  } else {
+    qrAnimationId = requestAnimationFrame(scanQrFrame);
+  }
+}
+
+function handleQrResult(data) {
+  const status = document.getElementById('qr-status');
+  const value = data.trim().toLowerCase();
+
+  if (value === 'cafe26') {
+    status.textContent = '¡Código válido! ✓';
+    stopQrScan();
+    closeVerifyOverlay();
+    registrarVisita();
+  } else {
+    showToast('Código QR no válido ❌');
+    // sigue escaneando por si apuntó a otro código sin querer
+    qrAnimationId = requestAnimationFrame(scanQrFrame);
+  }
+}
+
+function stopQrScan() {
+  if (qrAnimationId) cancelAnimationFrame(qrAnimationId);
+  qrAnimationId = null;
+
+  if (qrStream) {
+    qrStream.getTracks().forEach(t => t.stop());
+    qrStream = null;
+  }
+
+  const video = document.getElementById('qr-video');
+  if (video) video.srcObject = null;
+
+  const wrap = document.getElementById('qr-scanner-wrap');
+  if (wrap) wrap.style.display = 'none';
+}
+window.stopQrScan = stopQrScan;
+
+function confirmFromCode() {
+  const code = document.getElementById('code-input')
+    .value.trim()
+    .toLowerCase();
+
+  if (code === 'cafe26') {
+    closeVerifyOverlay();
+    registrarVisita();
+  } else {
+    showToast('Código incorrecto ❌');
+    document.getElementById('code-input').value = '';
+  }
+}
+
+    function registrarVisita() {
+      const today = new Date().toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+      visited[currentCafe.name] = today;
+      if (window.saveCheckin) window.saveCheckin(currentCafe.name, today);
+      refreshMarkers();
+      const btn = document.getElementById('checkin-btn');
+      btn.textContent = '✓ Visitado el ' + today;
+      btn.className = 'checkin-btn visited';
+      const count = visitedCount();
+      showToast('¡Sello agregado! Llevas ' + count + ' de ' + cafes.length + ' ☕');
+      REWARDS.forEach(r => {
+        if (count === r.need) setTimeout(() => showToast('🏆 Recompensa: ' + r.title + '!'), 3600);
+      });
+    }
+
+    // ──────────────────────────────────────────────
+    // PASSPORT
+    // ──────────────────────────────────────────────
+    function renderPassport() {
+      updatePassportIdCard();
+
+      const count = visitedCount();
+      const total = cafes.length;
+      const pct   = Math.round(count / total * 100);
+
+      document.getElementById('stat-visited').textContent = count;
+      document.getElementById('stat-total').textContent   = total;
+      document.getElementById('stat-pct').textContent     = pct + '%';
+      document.getElementById('progress-fill').style.width = pct + '%';
+      document.getElementById('progress-label').textContent = count + ' de ' + total + ' sellos';
+
+      document.getElementById('rewards-list').innerHTML = REWARDS.map(r => {
+        const unlocked = count >= r.need;
+        return `
+          <div class="reward-card">
+            <div class="reward-icon">${r.icon}</div>
+            <div class="reward-info">
+              <div class="reward-title">${r.title}</div>
+              <div class="reward-desc">${r.desc}</div>
+            </div>
+            <div class="reward-badge ${unlocked ? 'unlocked' : 'locked'}">${unlocked ? '¡Desbloqueado!' : r.need + ' cafés'}</div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('stamps-grid').innerHTML = cafes.map(c => {
+        const v = visited[c.name];
+        return `
+          <div class="stamp-item ${v ? 'stamped' : ''}" onclick="openCafeSheet('${encodeURIComponent(c.name)}')">
+            <span class="stamp-emoji">${v ? '☕' : '○'}</span>
+            <div class="stamp-name">${c.name}</div>
+            ${v ? `<div class="stamp-date">${v}</div>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    // ──────────────────────────────────────────────
+    // UTILS
+    // ──────────────────────────────────────────────
+    function normalize(s) {
+      return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    }
+  </script>
+</body>
+</html>
