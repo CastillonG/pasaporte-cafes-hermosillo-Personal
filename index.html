@@ -1014,6 +1014,12 @@
         <div class="spinner"></div>
         <span>Iniciando sesión…</span>
       </div>
+
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(245,234,216,.15);">
+        <button onclick="continueAsGuest()" style="background:transparent;border:none;color:rgba(245,234,216,.55);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;text-decoration:underline;">
+          Probar sin iniciar sesión (modo invitado)
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1243,13 +1249,13 @@
     // Activa Firestore Database
     // ══════════════════════════════════════════════════
     const FIREBASE_CONFIG = {
-      apiKey:            "AIzaSyA_aYk4M5bQD4Z15EOAPo0YTpqDZhq3dj4",
-      authDomain:        "pasaporte-del-cafe-d5df9.firebaseapp.com",
-      projectId:         "pasaporte-del-cafe-d5df9",
-      storageBucket:     "pasaporte-del-cafe-d5df9.firebasestorage.app",
-      messagingSenderId: "429826556683",
-      appId:             "1:429826556683:web:0be975bc413c303f20180e",
-      measurementId:     "G-3LHQFKQY7H"
+      apiKey:            "AIzaSyA2RK4dIenw_foOxiyaLF26vFDz1g9YMxw",
+      authDomain:        "pasaporte-cafe-personal.firebaseapp.com",
+      projectId:         "pasaporte-cafe-personal",
+      storageBucket:     "pasaporte-cafe-personal.firebasestorage.app",
+      messagingSenderId: "726020681833",
+      appId:             "1:726020681833:web:797abc2569fd93e93bb2f8",
+      measurementId:     "G-3R5NQY96RV"
     };
     // ══════════════════════════════════════════════════
 
@@ -1274,6 +1280,14 @@
       document.getElementById('auth-screen').classList.add('hidden');
       setupUIWithLocalStorage();
     }
+
+    // ── Modo invitado: salta Google/Firebase y usa el navegador local ──
+    window.continueAsGuest = function() {
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      document.getElementById('auth-screen').classList.add('hidden');
+      document.getElementById('config-notice').classList.remove('show');
+      setupUIWithLocalStorage();
+    };
 
     // ── Sign in ──
     window.signInWithGoogle = async function() {
