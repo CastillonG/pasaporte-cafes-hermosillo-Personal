@@ -1196,37 +1196,39 @@
         <button class="sheet-close" onclick="closeVerifyOverlay()">✕</button>
       </div>
 
-  <div id="verify-code">
-  <button class="checkin-btn unstamped" style="margin-bottom:14px;" onclick="startQrScan()">📷 Escanear código QR</button>
+      <div id="verify-code">
+        <button class="checkin-btn unstamped" style="margin-bottom:14px;" onclick="startQrScan()">📷 Escanear código QR</button>
 
-  <div id="qr-scanner-wrap" style="display:none;margin-bottom:14px;">
-    <video id="qr-video" playsinline muted style="width:100%;border-radius:12px;background:#000;display:block;"></video>
-    <canvas id="qr-canvas" style="display:none;"></canvas>
-    <div id="qr-status" style="font-size:12px;color:var(--espresso);opacity:.7;text-align:center;margin-top:8px;">
-      Apunta la cámara al código QR del café ☕
+        <div id="qr-scanner-wrap" style="display:none;margin-bottom:14px;">
+          <video id="qr-video" playsinline muted style="width:100%;border-radius:12px;background:#000;display:block;"></video>
+          <canvas id="qr-canvas" style="display:none;"></canvas>
+          <div id="qr-status" style="font-size:12px;color:var(--espresso);opacity:.7;text-align:center;margin-top:8px;">
+            Apunta la cámara al código QR del café ☕
+          </div>
+          <button class="checkin-btn"
+                  style="margin-top:8px;background:rgba(122,63,37,.1);color:var(--espresso);"
+                  onclick="stopQrScan()">
+            Cancelar escaneo
+          </button>
+        </div>
+
+        <div style="text-align:center;font-size:12px;color:var(--espresso);opacity:.5;margin:10px 0;">
+          — o ingresa el código manualmente —
+        </div>
+
+        <input id="code-input"
+               type="text"
+               placeholder="Ingresa el código del café"
+               style="width:100%;padding:14px;border-radius:12px;border:2px solid rgba(122,63,37,.25);font-size:16px;text-align:center;"/>
+
+        <button class="checkin-btn unstamped"
+                style="margin-top:12px;"
+                onclick="confirmFromCode()">
+          ✓ Confirmar
+        </button>
+      </div>
     </div>
-    <button class="checkin-btn"
-            style="margin-top:8px;background:rgba(122,63,37,.1);color:var(--espresso);"
-            onclick="stopQrScan()">
-      Cancelar escaneo
-    </button>
   </div>
-
-  <div style="text-align:center;font-size:12px;color:var(--espresso);opacity:.5;margin:10px 0;">
-    — o ingresa el código manualmente —
-  </div>
-
-  <input id="code-input"
-         type="text"
-         placeholder="Ingresa el código del café"
-         style="width:100%;padding:14px;border-radius:12px;border:2px solid rgba(122,63,37,.25);font-size:16px;text-align:center;"/>
-
-  <button class="checkin-btn unstamped"
-          style="margin-top:12px;"
-          onclick="confirmFromCode()">
-    ✓ Confirmar
-  </button>
-</div>
 
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
@@ -1254,7 +1256,7 @@
     const CONFIGURED = !FIREBASE_CONFIG.apiKey.startsWith("TU_");
 
     import { initializeApp }                      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut as fbSignOut }
                                                   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot }
                                                   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1276,6 +1278,13 @@
     // ── Sign in ──
     window.signInWithGoogle = async function() {
       if (!CONFIGURED) { document.getElementById('auth-screen').classList.add('hidden'); return; }
+
+      // file:// no soporta login de Firebase - avisamos antes de intentar
+      if (location.protocol === 'file:') {
+        alert('Estás abriendo el archivo directamente (file://). El login de Google no funciona así.\n\nSube el archivo a GitHub Pages o ábrelo con un servidor local (http/https) para poder iniciar sesión.');
+        return;
+      }
+
       document.getElementById('google-login-btn').style.display = 'none';
       document.getElementById('auth-loading').classList.add('show');
       try {
@@ -1284,9 +1293,40 @@
         console.error(e);
         document.getElementById('google-login-btn').style.display = 'flex';
         document.getElementById('auth-loading').classList.remove('show');
-        showToast('Error al iniciar sesión. Intenta de nuevo.');
+
+        // Si el popup fue bloqueado, intenta con redirect en vez de fallar en silencio
+        if (e.code === 'auth/popup-blocked' || e.code === 'auth/cancelled-popup-request' || e.code === 'auth/operation-not-supported-in-this-environment') {
+          try {
+            await signInWithRedirect(auth, provider);
+            return;
+          } catch (e2) {
+            console.error(e2);
+          }
+        }
+
+        showLoginError(e);
       }
     };
+
+    // Mostramos el error real para poder diagnosticar (dominio no autorizado, etc.)
+    function showLoginError(e) {
+      let msg = 'Error al iniciar sesión: ' + (e.code || e.message || 'desconocido');
+      if (e.code === 'auth/unauthorized-domain') {
+        msg = 'Este dominio (' + location.hostname + ') no está autorizado en Firebase.\n\n' +
+              'Ve a Firebase Console → Authentication → Settings → Authorized domains, y agrega: ' + location.hostname;
+      } else if (e.code === 'auth/popup-blocked') {
+        msg = 'Tu navegador bloqueó la ventana emergente de Google. Permite pop-ups para este sitio e intenta de nuevo.';
+      } else if (e.code === 'auth/popup-closed-by-user') {
+        msg = 'Cerraste la ventana de Google antes de terminar. Intenta de nuevo.';
+      }
+      alert(msg);
+      showToast('No se pudo iniciar sesión ❌');
+    }
+
+    // Si volvimos de un signInWithRedirect, procesamos el resultado
+    if (CONFIGURED) {
+      getRedirectResult(auth).catch(e => { console.error(e); showLoginError(e); });
+    }
 
     // ── Sign out ──
     window.signOut = async function() {
