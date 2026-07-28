@@ -1362,9 +1362,9 @@
           currentUser = user;
           updateUserUI(user);
           document.getElementById('auth-screen').classList.add('hidden');
+          initMap(); // mostrar el mapa de inmediato, sin esperar a Firestore
           await loadUserData(user.uid);
           setupRealtimeSync(user.uid);
-          initMap();
         } else {
           currentUser = null;
           updateUserUI(null);
@@ -1394,6 +1394,21 @@
       } catch (e) {
         console.error(e);
         setSyncDot('');
+        // No se pudo leer Firestore (¿base de datos no creada? ¿reglas de seguridad?).
+        // Seguimos igual, en modo local, para no dejar al usuario colgado.
+        visited = visited || {};
+        profile = profile || null;
+        refreshMarkers();
+        if (window.checkProfileScreen) window.checkProfileScreen();
+        let msg = 'No se pudo conectar con la base de datos: ' + (e.code || e.message || 'error desconocido');
+        if (e.code === 'permission-denied' || (e.message||'').includes('PERMISSION_DENIED')) {
+          msg = 'Firestore rechazó el acceso (reglas de seguridad). Ve a Firebase Console → Firestore Database → Reglas.';
+        } else if ((e.message||'').toLowerCase().includes('not been used') || (e.message||'').toLowerCase().includes('does not exist')) {
+          msg = 'Parece que Firestore Database no está creado en este proyecto. Ve a Firebase Console → Firestore Database → Crear base de datos.';
+        }
+        showToast('⚠️ Guardando solo en este dispositivo');
+        console.warn(msg);
+        alert(msg);
       }
     }
 
