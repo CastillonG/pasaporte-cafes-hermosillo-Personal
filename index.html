@@ -1448,6 +1448,10 @@
           const activePage = document.querySelector('.nav-tab.active');
           if (activePage && activePage.textContent === 'Mi Pasaporte') renderPassport();
         }
+      }, e => {
+        console.error('Error de sincronización en tiempo real:', e);
+        setSyncDot('');
+        showToast('Error de sincronización con Firebase ⚠️');
       });
     }
 
@@ -1457,18 +1461,22 @@
       try {
         if (CONFIGURED && currentUser) {
           const ref = doc(db, 'users', currentUser.uid);
-          await updateDoc(ref, { [`visited.${safeFbKey(cafeName)}`]: dateStr });
+          // setDoc + merge funciona aunque el documento todavía no exista.
+          await setDoc(ref, {
+            visited: { [safeFbKey(cafeName)]: dateStr },
+            email: currentUser.email || '',
+            name: currentUser.displayName || ''
+          }, { merge: true });
         } else {
           localStorage.setItem('cafeVisited', JSON.stringify(visited));
         }
         setSyncDot('synced');
+        return true;
       } catch (e) {
-        // If doc doesn't exist yet, create it
-        try {
-          const ref = doc(db, 'users', currentUser.uid);
-          await setDoc(ref, { visited, email: currentUser.email, name: currentUser.displayName });
-          setSyncDot('synced');
-        } catch (e2) { console.error(e2); setSyncDot(''); }
+        console.error('Error guardando visita:', e);
+        setSyncDot('');
+        showToast('No se pudo guardar la visita ❌');
+        return false;
       }
     };
 
@@ -1478,15 +1486,19 @@
       try {
         if (CONFIGURED && currentUser) {
           const ref = doc(db, 'users', currentUser.uid);
-          await updateDoc(ref, { [`visited.${safeFbKey(cafeName)}`]: deleteField() });
+          await setDoc(ref, {
+            visited: { [safeFbKey(cafeName)]: deleteField() }
+          }, { merge: true });
         } else {
           localStorage.setItem('cafeVisited', JSON.stringify(visited));
         }
         setSyncDot('synced');
+        return true;
       } catch (e) {
-        console.error(e);
+        console.error('Error cancelando visita:', e);
         setSyncDot('');
         showToast('No se pudo cancelar el registro ❌');
+        return false;
       }
     };
 
@@ -1496,17 +1508,21 @@
       try {
         if (CONFIGURED && currentUser) {
           const ref = doc(db, 'users', currentUser.uid);
-          await updateDoc(ref, { profile: profileData });
+          await setDoc(ref, {
+            profile: profileData,
+            email: currentUser.email || '',
+            name: currentUser.displayName || ''
+          }, { merge: true });
         } else {
           localStorage.setItem('cafeProfile', JSON.stringify(profileData));
         }
         setSyncDot('synced');
+        return true;
       } catch (e) {
-        try {
-          const ref = doc(db, 'users', currentUser.uid);
-          await setDoc(ref, { visited, profile: profileData, email: currentUser.email, name: currentUser.displayName }, { merge: true });
-          setSyncDot('synced');
-        } catch (e2) { console.error(e2); setSyncDot(''); }
+        console.error('Error guardando perfil:', e);
+        setSyncDot('');
+        showToast('No se pudo guardar el perfil ❌');
+        return false;
       }
     };
 
@@ -1662,7 +1678,7 @@
     }
     window.checkProfileScreen = checkProfileScreen;
 
-    function submitProfile() {
+    async function submitProfile() {
       const gender  = document.getElementById('profile-gender').value;
       const age     = document.getElementById('profile-age').value;
       const funFact = document.getElementById('profile-funfact').value.trim();
@@ -1673,7 +1689,8 @@
       }
 
       profile = { gender, age, funFact };
-      if (window.saveProfile) window.saveProfile(profile);
+      const saved = window.saveProfile ? await window.saveProfile(profile) : false;
+      if (!saved) return;
       document.getElementById('profile-screen').classList.remove('show');
       updatePassportIdCard();
       showToast('¡Perfil guardado! 🛂');
@@ -1857,23 +1874,28 @@
       if (e.target === document.getElementById('overlay')) closeOverlay();
     }
 
-window.doCheckin = function() {
+window.doCheckin = async function() {
   if (!currentCafe) return;
 
   if (visited[currentCafe.name]) {
-    cancelarVisita();
+    await cancelarVisita();
     return;
   }
 
-  registrarVisita();
+  await registrarVisita();
 };
 
-function cancelarVisita() {
+async function cancelarVisita() {
   if (!currentCafe || !visited[currentCafe.name]) return;
 
   const cafeName = currentCafe.name;
+  const previousDate = visited[cafeName];
   delete visited[cafeName];
-  if (window.removeCheckin) window.removeCheckin(cafeName);
+  const saved = window.removeCheckin ? await window.removeCheckin(cafeName) : false;
+  if (!saved) {
+    visited[cafeName] = previousDate;
+    return;
+  }
 
   refreshMarkers();
   const btn = document.getElementById('checkin-btn');
@@ -1902,10 +1924,15 @@ window.openMedals = openMedals;
 window.closeMedalsOverlay = closeMedalsOverlay;
 window.closeMedals = closeMedals;
 
-    function registrarVisita() {
+    async function registrarVisita() {
       const today = new Date().toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
-      visited[currentCafe.name] = today;
-      if (window.saveCheckin) window.saveCheckin(currentCafe.name, today);
+      const cafeName = currentCafe.name;
+      visited[cafeName] = today;
+      const saved = window.saveCheckin ? await window.saveCheckin(cafeName, today) : false;
+      if (!saved) {
+        delete visited[cafeName];
+        return;
+      }
       refreshMarkers();
       const btn = document.getElementById('checkin-btn');
       btn.textContent = 'Cancelar registro · Visitado el ' + today;
