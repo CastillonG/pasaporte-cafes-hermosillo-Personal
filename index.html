@@ -1372,7 +1372,7 @@
       if (unsubscribeSnapshot) unsubscribeSnapshot();
       if (CONFIGURED && auth) await fbSignOut(auth);
       else { localStorage.removeItem('cafeVisited'); }
-      visited = {};
+      window.visited = {};
       currentUser = null;
       updateUserUI(null);
       refreshMarkers();
@@ -1402,8 +1402,8 @@
       setSyncDot('syncing');
 
       // Carga inmediata desde el dispositivo para que la app nunca quede bloqueada.
-      visited = JSON.parse(localStorage.getItem('cafeVisited') || '{}');
-      profile = JSON.parse(localStorage.getItem('cafeProfile') || 'null');
+      window.visited = JSON.parse(localStorage.getItem('cafeVisited') || '{}');
+      window.profile = JSON.parse(localStorage.getItem('cafeProfile') || 'null');
       refreshMarkers();
       if (window.checkProfileScreen) window.checkProfileScreen();
 
@@ -1411,19 +1411,19 @@
         const ref  = doc(db, 'users', uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          visited = snap.data().visited || visited || {};
-          profile = snap.data().profile || profile || null;
+          window.visited = snap.data().visited || window.visited || {};
+          window.profile = snap.data().profile || window.profile || null;
         } else {
           await setDoc(ref, {
-            visited: visited || {},
-            profile: profile || null,
+            visited: window.visited || {},
+            profile: window.profile || null,
             email: currentUser.email || '',
             name: currentUser.displayName || ''
           }, { merge: true });
         }
 
-        localStorage.setItem('cafeVisited', JSON.stringify(visited || {}));
-        localStorage.setItem('cafeProfile', JSON.stringify(profile || null));
+        localStorage.setItem('cafeVisited', JSON.stringify(window.visited || {}));
+        localStorage.setItem('cafeProfile', JSON.stringify(window.profile || null));
         setSyncDot('synced');
         refreshMarkers();
         if (window.checkProfileScreen) window.checkProfileScreen();
@@ -1440,8 +1440,8 @@
       const ref = doc(db, 'users', uid);
       unsubscribeSnapshot = onSnapshot(ref, snap => {
         if (snap.exists()) {
-          visited = snap.data().visited || {};
-          profile = snap.data().profile || null;
+          window.visited = snap.data().visited || {};
+          window.profile = snap.data().profile || null;
           refreshMarkers();
           const activePage = document.querySelector('.nav-tab.active');
           if (activePage && activePage.textContent === 'Mi Pasaporte') renderPassport();
@@ -1455,50 +1455,55 @@
 
     // ── Firestore: save check-in ──
     window.saveCheckin = async function(cafeName, dateStr) {
-      // Guardado local inmediato: nunca se pierde aunque Firebase esté caído.
-      localStorage.setItem('cafeVisited', JSON.stringify(visited || {}));
+      localStorage.setItem('cafeVisited', JSON.stringify(window.visited || {}));
       setSyncDot('syncing');
       if (!(CONFIGURED && currentUser)) { setSyncDot('synced'); return true; }
 
       try {
         const ref = doc(db, 'users', currentUser.uid);
         await setDoc(ref, {
-          visited: { [safeFbKey(cafeName)]: dateStr },
+          visited: window.visited || {},
+          profile: window.profile || null,
           email: currentUser.email || '',
           name: currentUser.displayName || ''
         }, { merge: true });
         setSyncDot('synced');
+        return true;
       } catch (e) {
-        console.error('Visita guardada localmente; Firebase pendiente:', e);
+        console.error('No se pudo sincronizar la visita:', e);
         setSyncDot('');
-        showToast('Visita guardada en este dispositivo ⚠️');
+        showToast('Sello guardado en este dispositivo; Firebase pendiente ⚠️');
+        return true;
       }
-      return true;
     };
 
     // ── Firestore: remove check-in ──
     window.removeCheckin = async function(cafeName) {
-      localStorage.setItem('cafeVisited', JSON.stringify(visited || {}));
+      localStorage.setItem('cafeVisited', JSON.stringify(window.visited || {}));
       setSyncDot('syncing');
       if (!(CONFIGURED && currentUser)) { setSyncDot('synced'); return true; }
 
       try {
         const ref = doc(db, 'users', currentUser.uid);
         await setDoc(ref, {
-          visited: { [safeFbKey(cafeName)]: deleteField() }
+          visited: window.visited || {},
+          profile: window.profile || null,
+          email: currentUser.email || '',
+          name: currentUser.displayName || ''
         }, { merge: true });
         setSyncDot('synced');
+        return true;
       } catch (e) {
-        console.error('Cancelación guardada localmente; Firebase pendiente:', e);
+        console.error('No se pudo sincronizar la cancelación:', e);
         setSyncDot('');
-        showToast('Cambio guardado en este dispositivo ⚠️');
+        showToast('Cambio guardado en este dispositivo; Firebase pendiente ⚠️');
+        return true;
       }
-      return true;
     };
 
     // ── Firestore: save profile ──
     window.saveProfile = async function(profileData) {
-      profile = profileData;
+      window.profile = profileData;
       localStorage.setItem('cafeProfile', JSON.stringify(profileData));
       setSyncDot('syncing');
       if (!(CONFIGURED && currentUser)) { setSyncDot('synced'); return true; }
@@ -1506,17 +1511,19 @@
       try {
         const ref = doc(db, 'users', currentUser.uid);
         await setDoc(ref, {
+          visited: window.visited || {},
           profile: profileData,
           email: currentUser.email || '',
           name: currentUser.displayName || ''
         }, { merge: true });
         setSyncDot('synced');
+        return true;
       } catch (e) {
-        console.error('Perfil guardado localmente; Firebase pendiente:', e);
+        console.error('No se pudo sincronizar el perfil:', e);
         setSyncDot('');
-        showToast('Perfil guardado en este dispositivo ⚠️');
+        showToast('Perfil guardado en este dispositivo; Firebase pendiente ⚠️');
+        return true;
       }
-      return true;
     };
 
     // Firestore keys can't have slashes — replace with unicode lookalike
@@ -1524,17 +1531,20 @@
 
     // ── Fallback: no Firebase ──
     function setupUIWithLocalStorage() {
-      visited = JSON.parse(localStorage.getItem('cafeVisited') || '{}');
-      profile = JSON.parse(localStorage.getItem('cafeProfile') || 'null');
+      window.visited = JSON.parse(localStorage.getItem('cafeVisited') || '{}');
+      window.profile = JSON.parse(localStorage.getItem('cafeProfile') || 'null');
       window.saveCheckin = function(cafeName) {
-        localStorage.setItem('cafeVisited', JSON.stringify(visited));
+        localStorage.setItem('cafeVisited', JSON.stringify(window.visited || {}));
+        return true;
       };
       window.removeCheckin = function() {
-        localStorage.setItem('cafeVisited', JSON.stringify(visited));
+        localStorage.setItem('cafeVisited', JSON.stringify(window.visited || {}));
+        return true;
       };
       window.saveProfile = function(profileData) {
-        profile = profileData;
+        window.profile = profileData;
         localStorage.setItem('cafeProfile', JSON.stringify(profileData));
+        return true;
       };
       updateUserUI({ displayName:'Invitado', email:'Sin cuenta', photoURL: null });
       initMap();
@@ -1629,8 +1639,8 @@
     // ──────────────────────────────────────────────
     // STATE
     // ──────────────────────────────────────────────
-    var visited = {};
-    var profile = null;
+    var visited = window.visited = window.visited || {};
+    var profile = window.profile = window.profile || null;
     let currentCafe = null;
     let mapInitialized = false;
     let markersByName = new Map();
