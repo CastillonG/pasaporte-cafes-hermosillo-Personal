@@ -1397,13 +1397,28 @@
       });
     }
 
+    // ── Estado compartido entre el script normal y el módulo Firebase ──
+    // Nunca reemplazamos el objeto `window.visited`; lo actualizamos en el mismo lugar
+    // para que todos los botones, el mapa, localStorage y Firebase vean lo mismo.
+    function replaceSharedVisited(nextVisited) {
+      const target = window.visited || (window.visited = {});
+      Object.keys(target).forEach(key => delete target[key]);
+      Object.assign(target, nextVisited || {});
+      return target;
+    }
+
+    function setSharedProfile(nextProfile) {
+      window.profile = nextProfile || null;
+      return window.profile;
+    }
+
     // ── Firestore: load data ──
     async function loadUserData(uid) {
       setSyncDot('syncing');
 
       // Carga inmediata desde el dispositivo para que la app nunca quede bloqueada.
-      window.visited = JSON.parse(localStorage.getItem('cafeVisited') || '{}');
-      window.profile = JSON.parse(localStorage.getItem('cafeProfile') || 'null');
+      replaceSharedVisited(JSON.parse(localStorage.getItem('cafeVisited') || '{}'));
+      setSharedProfile(JSON.parse(localStorage.getItem('cafeProfile') || 'null'));
       refreshMarkers();
       if (window.checkProfileScreen) window.checkProfileScreen();
 
@@ -1411,8 +1426,8 @@
         const ref  = doc(db, 'users', uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          window.visited = snap.data().visited || window.visited || {};
-          window.profile = snap.data().profile || window.profile || null;
+          replaceSharedVisited(snap.data().visited || window.visited || {});
+          setSharedProfile(snap.data().profile || window.profile || null);
         } else {
           await setDoc(ref, {
             visited: window.visited || {},
@@ -1440,8 +1455,8 @@
       const ref = doc(db, 'users', uid);
       unsubscribeSnapshot = onSnapshot(ref, snap => {
         if (snap.exists()) {
-          window.visited = snap.data().visited || {};
-          window.profile = snap.data().profile || null;
+          replaceSharedVisited(snap.data().visited || {});
+          setSharedProfile(snap.data().profile || null);
           refreshMarkers();
           const activePage = document.querySelector('.nav-tab.active');
           if (activePage && activePage.textContent === 'Mi Pasaporte') renderPassport();
@@ -1531,8 +1546,8 @@
 
     // ── Fallback: no Firebase ──
     function setupUIWithLocalStorage() {
-      window.visited = JSON.parse(localStorage.getItem('cafeVisited') || '{}');
-      window.profile = JSON.parse(localStorage.getItem('cafeProfile') || 'null');
+      replaceSharedVisited(JSON.parse(localStorage.getItem('cafeVisited') || '{}'));
+      setSharedProfile(JSON.parse(localStorage.getItem('cafeProfile') || 'null'));
       window.saveCheckin = function(cafeName) {
         localStorage.setItem('cafeVisited', JSON.stringify(window.visited || {}));
         return true;
@@ -1671,6 +1686,7 @@
     // PROFILE (cuestionario obligatorio)
     // ──────────────────────────────────────────────
     function checkProfileScreen() {
+      profile = window.profile || profile || null;
       const complete = profile && profile.gender && profile.age && profile.funFact;
       if (!complete) {
         document.getElementById('profile-screen').classList.add('show');
@@ -1691,7 +1707,7 @@
         return;
       }
 
-      profile = { gender, age, funFact };
+      profile = window.profile = { gender, age, funFact };
       const saved = window.saveProfile ? await window.saveProfile(profile) : false;
       if (!saved) return;
       document.getElementById('profile-screen').classList.remove('show');
@@ -1701,6 +1717,7 @@
     window.submitProfile = submitProfile;
 
     function updatePassportIdCard() {
+      profile = window.profile || profile || null;
       const name = window.currentDisplayName || 'Invitado';
       document.getElementById('id-name').textContent    = name;
       document.getElementById('id-gender').textContent  = profile ? profile.gender  : '—';
@@ -1840,6 +1857,7 @@
       const cafe = cafes.find(c => c.name === name);
       if (!cafe) return;
       currentCafe = cafe;
+      visited = window.visited || visited || {};
 
       document.getElementById('sheet-name').textContent = cafe.name;
       document.getElementById('sheet-address').textContent = '📍 ' + cafe.address;
@@ -1879,6 +1897,7 @@
 
 window.doCheckin = async function() {
   if (!currentCafe) return;
+  visited = window.visited || visited || {};
 
   if (visited[currentCafe.name]) {
     await cancelarVisita();
@@ -1889,6 +1908,7 @@ window.doCheckin = async function() {
 };
 
 async function cancelarVisita() {
+  visited = window.visited || visited || {};
   if (!currentCafe || !visited[currentCafe.name]) return;
 
   const cafeName = currentCafe.name;
@@ -1928,6 +1948,7 @@ window.closeMedalsOverlay = closeMedalsOverlay;
 window.closeMedals = closeMedals;
 
     async function registrarVisita() {
+      visited = window.visited || visited || {};
       const today = new Date().toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
       const cafeName = currentCafe.name;
       visited[cafeName] = today;
@@ -1948,6 +1969,8 @@ window.closeMedals = closeMedals;
     // PASSPORT
     // ──────────────────────────────────────────────
     function renderPassport() {
+      visited = window.visited || visited || {};
+      profile = window.profile || profile || null;
       updatePassportIdCard();
 
       const count = visitedCount();
