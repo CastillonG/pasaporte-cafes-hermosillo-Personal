@@ -1288,7 +1288,7 @@
     import { initializeApp }                      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut as fbSignOut }
                                                   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField }
+    import { initializeFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField }
                                                   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     let app, auth, db, provider, currentUser = null, unsubscribeSnapshot = null;
@@ -1296,7 +1296,7 @@
     if (CONFIGURED) {
       app      = initializeApp(FIREBASE_CONFIG);
       auth     = getAuth(app);
-      db       = getFirestore(app);
+      db       = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
       provider = new GoogleAuthProvider();
     } else {
       // Not configured — show notice and fallback to localStorage
@@ -1400,39 +1400,37 @@
     // ── Firestore: load data ──
     async function loadUserData(uid) {
       setSyncDot('syncing');
+
+      // Carga inmediata desde el dispositivo para que la app nunca quede bloqueada.
+      visited = JSON.parse(localStorage.getItem('cafeVisited') || '{}');
+      profile = JSON.parse(localStorage.getItem('cafeProfile') || 'null');
+      refreshMarkers();
+      if (window.checkProfileScreen) window.checkProfileScreen();
+
       try {
         const ref  = doc(db, 'users', uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          visited = snap.data().visited || {};
-          profile = snap.data().profile || null;
+          visited = snap.data().visited || visited || {};
+          profile = snap.data().profile || profile || null;
         } else {
-          // New user — always start at zero
-          visited = {};
-          profile = null;
-          await setDoc(ref, { visited: {}, profile: null, email: currentUser.email, name: currentUser.displayName });
+          await setDoc(ref, {
+            visited: visited || {},
+            profile: profile || null,
+            email: currentUser.email || '',
+            name: currentUser.displayName || ''
+          }, { merge: true });
         }
+
+        localStorage.setItem('cafeVisited', JSON.stringify(visited || {}));
+        localStorage.setItem('cafeProfile', JSON.stringify(profile || null));
         setSyncDot('synced');
         refreshMarkers();
         if (window.checkProfileScreen) window.checkProfileScreen();
       } catch (e) {
-        console.error(e);
+        console.error('Firestore no disponible; se mantiene guardado local:', e);
         setSyncDot('');
-        // No se pudo leer Firestore (¿base de datos no creada? ¿reglas de seguridad?).
-        // Seguimos igual, en modo local, para no dejar al usuario colgado.
-        visited = visited || {};
-        profile = profile || null;
-        refreshMarkers();
-        if (window.checkProfileScreen) window.checkProfileScreen();
-        let msg = 'No se pudo conectar con la base de datos: ' + (e.code || e.message || 'error desconocido');
-        if (e.code === 'permission-denied' || (e.message||'').includes('PERMISSION_DENIED')) {
-          msg = 'Firestore rechazó el acceso (reglas de seguridad). Ve a Firebase Console → Firestore Database → Reglas.';
-        } else if ((e.message||'').toLowerCase().includes('not been used') || (e.message||'').toLowerCase().includes('does not exist')) {
-          msg = 'Parece que Firestore Database no está creado en este proyecto. Ve a Firebase Console → Firestore Database → Crear base de datos.';
-        }
-        showToast('⚠️ Guardando solo en este dispositivo');
-        console.warn(msg);
-        alert(msg);
+        showToast('Guardado en este dispositivo; sincronización pendiente ⚠️');
       }
     }
 
@@ -1457,73 +1455,68 @@
 
     // ── Firestore: save check-in ──
     window.saveCheckin = async function(cafeName, dateStr) {
+      // Guardado local inmediato: nunca se pierde aunque Firebase esté caído.
+      localStorage.setItem('cafeVisited', JSON.stringify(visited || {}));
       setSyncDot('syncing');
+      if (!(CONFIGURED && currentUser)) { setSyncDot('synced'); return true; }
+
       try {
-        if (CONFIGURED && currentUser) {
-          const ref = doc(db, 'users', currentUser.uid);
-          // setDoc + merge funciona aunque el documento todavía no exista.
-          await setDoc(ref, {
-            visited: { [safeFbKey(cafeName)]: dateStr },
-            email: currentUser.email || '',
-            name: currentUser.displayName || ''
-          }, { merge: true });
-        } else {
-          localStorage.setItem('cafeVisited', JSON.stringify(visited));
-        }
+        const ref = doc(db, 'users', currentUser.uid);
+        await setDoc(ref, {
+          visited: { [safeFbKey(cafeName)]: dateStr },
+          email: currentUser.email || '',
+          name: currentUser.displayName || ''
+        }, { merge: true });
         setSyncDot('synced');
-        return true;
       } catch (e) {
-        console.error('Error guardando visita:', e);
+        console.error('Visita guardada localmente; Firebase pendiente:', e);
         setSyncDot('');
-        showToast('No se pudo guardar la visita ❌');
-        return false;
+        showToast('Visita guardada en este dispositivo ⚠️');
       }
+      return true;
     };
 
     // ── Firestore: remove check-in ──
     window.removeCheckin = async function(cafeName) {
+      localStorage.setItem('cafeVisited', JSON.stringify(visited || {}));
       setSyncDot('syncing');
+      if (!(CONFIGURED && currentUser)) { setSyncDot('synced'); return true; }
+
       try {
-        if (CONFIGURED && currentUser) {
-          const ref = doc(db, 'users', currentUser.uid);
-          await setDoc(ref, {
-            visited: { [safeFbKey(cafeName)]: deleteField() }
-          }, { merge: true });
-        } else {
-          localStorage.setItem('cafeVisited', JSON.stringify(visited));
-        }
+        const ref = doc(db, 'users', currentUser.uid);
+        await setDoc(ref, {
+          visited: { [safeFbKey(cafeName)]: deleteField() }
+        }, { merge: true });
         setSyncDot('synced');
-        return true;
       } catch (e) {
-        console.error('Error cancelando visita:', e);
+        console.error('Cancelación guardada localmente; Firebase pendiente:', e);
         setSyncDot('');
-        showToast('No se pudo cancelar el registro ❌');
-        return false;
+        showToast('Cambio guardado en este dispositivo ⚠️');
       }
+      return true;
     };
 
     // ── Firestore: save profile ──
     window.saveProfile = async function(profileData) {
+      profile = profileData;
+      localStorage.setItem('cafeProfile', JSON.stringify(profileData));
       setSyncDot('syncing');
+      if (!(CONFIGURED && currentUser)) { setSyncDot('synced'); return true; }
+
       try {
-        if (CONFIGURED && currentUser) {
-          const ref = doc(db, 'users', currentUser.uid);
-          await setDoc(ref, {
-            profile: profileData,
-            email: currentUser.email || '',
-            name: currentUser.displayName || ''
-          }, { merge: true });
-        } else {
-          localStorage.setItem('cafeProfile', JSON.stringify(profileData));
-        }
+        const ref = doc(db, 'users', currentUser.uid);
+        await setDoc(ref, {
+          profile: profileData,
+          email: currentUser.email || '',
+          name: currentUser.displayName || ''
+        }, { merge: true });
         setSyncDot('synced');
-        return true;
       } catch (e) {
-        console.error('Error guardando perfil:', e);
+        console.error('Perfil guardado localmente; Firebase pendiente:', e);
         setSyncDot('');
-        showToast('No se pudo guardar el perfil ❌');
-        return false;
+        showToast('Perfil guardado en este dispositivo ⚠️');
       }
+      return true;
     };
 
     // Firestore keys can't have slashes — replace with unicode lookalike
